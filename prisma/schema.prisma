@@ -1,0 +1,61 @@
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  EMPLOYEE
+  MANAGER
+}
+
+enum TaskStatus {
+  IN_PROGRESS
+  DONE
+  PAUSED
+  OVERDUE
+  CLOSED
+}
+
+model User {
+  id        BigInt   @id // Telegram ID
+  role      Role     @default(EMPLOYEE)
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdTasks  Task[] @relation("CreatedTasks")
+  assignedTasks Task[] @relation("AssignedTasks")
+}
+
+model Task {
+  id          Int        @id @default(autoincrement())
+  title       String
+  description String?
+  status      TaskStatus @default(IN_PROGRESS)
+  deadline    DateTime?
+  subtasks    Json? // Array of strings or objects
+  
+  creatorId   BigInt
+  creator     User     @relation("CreatedTasks", fields: [creatorId], references: [id])
+  
+  assigneeId  BigInt?
+  assignee    User?    @relation("AssignedTasks", fields: [assigneeId], references: [id])
+
+  attachments Attachment[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Attachment {
+  id        Int      @id @default(autoincrement())
+  url       String
+  type      String // PDF, DOCX, IMAGE, etc.
+  taskId    Int
+  task      Task     @relation(fields: [taskId], references: [id])
+  createdAt DateTime @default(now())
+}
