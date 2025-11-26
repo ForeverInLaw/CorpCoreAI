@@ -1,5 +1,5 @@
 import { Bot, Context, InlineKeyboard, Keyboard } from 'grammy'
-import type { TaskStatus, User } from '@prisma/client'
+import type { Prisma, TaskStatus, User } from '@prisma/client'
 import type { Document, PhotoSize } from 'grammy/types'
 import { prisma } from '../db'
 import { parseTask } from '../ai'
@@ -48,13 +48,30 @@ type TaskDraftWithDeadline = TaskDraftBase & {
     deadline: Date
 }
 
+type TaskWithRelations = Prisma.TaskGetPayload<{
+    include: { assignee: true; creator: true }
+}>
+
 const pendingManagerTasks = new Map<number, TaskDraftWithDeadline>()
 const pendingDeadlineRequests = new Map<number, TaskDraftBase>()
 const pendingAttachmentUploads = new Map<number, { taskId: number }>()
+const pendingTaskDeadlineAdjustments = new Map<
+    number,
+    { taskId: number; stage: 'reason' | 'deadline'; reason?: string; initiatedByManager: boolean }
+>()
 
-const mainKeyboard = new Keyboard().text('Мои задачи').resized()
+const mainKeyboard = new Keyboard().text('Мои задачи').row().text('Прикрепить файл').resized()
 const TASKS_PAGE_SIZE = 10
 const ATTACHABLE_STATUSES: TaskStatus[] = ['IN_PROGRESS', 'PAUSED', 'OVERDUE']
+const STATUS_ACTIONS: TaskStatus[] = ['IN_PROGRESS', 'PAUSED', 'DONE']
+const STATUS_LABELS: Record<TaskStatus, string> = {
+    IN_PROGRESS: 'В работе',
+    PAUSED: 'На паузе',
+    OVERDUE: 'Просрочена',
+    DONE: 'Готово',
+    CLOSED: 'Закрыта',
+}
+const EMPLOYEE_FORBIDDEN_STATUSES = new Set<TaskStatus>(['CLOSED'])
 
 type AttachmentTaskAccess = {
     id: number
@@ -70,6 +87,22 @@ type AttachmentTaskSummary = AttachmentTaskAccess & {
 type TaskListResult = {
     tasks: AttachmentTaskSummary[]
     hasNext: boolean
+}
+
+function hasTaskAccess(creatorId: bigint, assigneeId: bigint | null, user: User): boolean {
+    if (user.role === 'MANAGER') {
+        return true
+    }
+
+    if (creatorId === user.id) {
+        return true
+    }
+
+    if (assigneeId && assigneeId === user.id) {
+        return true
+    }
+
+    return false
 }
 
 type TelegramFileDescriptor = {
@@ -224,6 +257,15 @@ function extractDeadlineFromText(text: string): Date | null {
     return null
 }
 
+function parseUserDeadlineInput(rawText: string): Date | null {
+    const direct = parseIsoDeadline(rawText.trim())
+    if (direct) {
+        return direct
+    }
+
+    return extractDeadlineFromText(rawText)
+}
+
 function extractRelativeDeadline(rawText: string): Date | null {
     const text = rawText.toLowerCase()
     const today = new Date()
@@ -316,6 +358,12 @@ function addUtcDays(reference: Date, days: number): Date {
     return clone
 }
 
+function normalizeStartOfUtcDay(date: Date): Date {
+    const normalized = new Date(date)
+    normalized.setUTCHours(0, 0, 0, 0)
+    return normalized
+}
+
 async function findTaskForAttachment(taskId: number): Promise<AttachmentTaskAccess | null> {
     return prisma.task.findUnique({
         where: { id: taskId },
@@ -385,18 +433,242 @@ function truncateTitle(title: string, max = 32): string {
 }
 
 function formatStatus(status: TaskStatus): string {
-    const mapping: Record<TaskStatus, string> = {
-        IN_PROGRESS: 'в работе',
-        PAUSED: 'на паузе',
-        OVERDUE: 'просрочена',
-        DONE: 'готово',
-        CLOSED: 'закрыта',
+    return STATUS_LABELS[status] ?? status
+}
+
+function canAccessTask(task: TaskWithRelations, user: User): boolean {
+    if (user.role === 'MANAGER') {
+        return true
     }
-    return mapping[status] ?? status
+
+    if (task.creatorId === user.id) {
+        return true
+    }
+
+    if (task.assigneeId && task.assigneeId === user.id) {
+        return true
+    }
+
+    return false
+}
+
+function buildTaskSummaryMessage(task: TaskWithRelations): string {
+    const creator = task.creator?.name ?? `ID ${task.creatorId.toString()}`
+    const assignee = task.assignee?.name ?? (task.assigneeId ? `ID ${task.assigneeId.toString()}` : 'Не назначена')
+    const deadline = task.deadline ? formatDeadlineForDisplay(task.deadline) : '—'
+
+    return [
+        `#${task.id} · ${task.title}`,
+        `Статус: ${formatStatus(task.status)}`,
+        `Дедлайн: ${deadline}`,
+        `Создатель: ${creator}`,
+        `Исполнитель: ${assignee}`,
+    ].join('\n')
+}
+
+function buildTaskActionKeyboard(task: TaskWithRelations, user: User): InlineKeyboard {
+    const keyboard = new InlineKeyboard()
+    const statuses = [...STATUS_ACTIONS]
+    if (user.role === 'MANAGER') {
+        statuses.push('CLOSED')
+    }
+
+    statuses
+        .filter((status) => status !== task.status)
+        .forEach((status) => {
+            keyboard.text(STATUS_LABELS[status], `task-status:${task.id}:${status}`).row()
+        })
+
+    keyboard.text('Обновить дедлайн', `task-deadline:${task.id}`).row()
+
+    if (task.status === 'OVERDUE' && task.assigneeId && task.assigneeId === user.id) {
+        keyboard.text('Объяснить просрочку', `task-overdue:${task.id}`).row()
+    }
+
+    keyboard.text('Прикрепить файл', `attach-task:${task.id}`).row()
+
+    return keyboard
+}
+
+async function fetchTaskWithRelations(taskId: number): Promise<TaskWithRelations | null> {
+    return prisma.task.findUnique({
+        where: { id: taskId },
+        include: { assignee: true, creator: true },
+    })
+}
+
+async function sendTaskDetails(ctx: BotContext, task: TaskWithRelations, options: { edit?: boolean } = {}) {
+    const text = buildTaskSummaryMessage(task)
+    const keyboard = buildTaskActionKeyboard(task, ctx.user)
+
+    if (options.edit && ctx.callbackQuery?.message) {
+        await ctx.editMessageText(text, { reply_markup: keyboard })
+    } else {
+        await ctx.reply(text, { reply_markup: keyboard })
+    }
+}
+
+async function fetchLatestTasksForUser(user: User, limit = 5): Promise<TaskWithRelations[]> {
+    return prisma.task.findMany({
+        where:
+            user.role === 'MANAGER'
+                ? undefined
+                : {
+                      OR: [{ creatorId: user.id }, { assigneeId: user.id }],
+                  },
+        include: { assignee: true, creator: true },
+        orderBy: { updatedAt: 'desc' },
+        take: limit,
+    })
+}
+
+async function sendTaskOverview(ctx: BotContext) {
+    const tasks = await fetchLatestTasksForUser(ctx.user)
+    if (tasks.length === 0) {
+        await ctx.reply('У вас пока нет задач. Создайте новую задачу в этом чате или через веб-приложение.')
+        return
+    }
+
+    const header = `Показываю последние ${tasks.length} задач(и). Нажмите на задачу, чтобы открыть детали.`
+    const lines = tasks.map((task) => `#${task.id} · ${truncateTitle(task.title)} (${formatStatus(task.status)})`)
+    const keyboard = new InlineKeyboard()
+    tasks.forEach((task) => {
+        keyboard.text(`#${task.id} · ${truncateTitle(task.title, 22)}`, `task-view:${task.id}`).row()
+    })
+
+    await ctx.reply(`${header}\n\n${lines.join('\n')}`, { reply_markup: keyboard })
+}
+
+async function handleTaskStatusChange(ctx: BotContext, taskId: number, nextStatus: TaskStatus) {
+    const task = await fetchTaskWithRelations(taskId)
+    if (!task) {
+        await ctx.answerCallbackQuery({ text: 'Задача не найдена', show_alert: true })
+        return
+    }
+
+    if (!canAccessTask(task, ctx.user)) {
+        await ctx.answerCallbackQuery({ text: 'Нет доступа к задаче', show_alert: true })
+        return
+    }
+
+    if (ctx.user.role !== 'MANAGER' && EMPLOYEE_FORBIDDEN_STATUSES.has(nextStatus)) {
+        await ctx.answerCallbackQuery({ text: 'Недостаточно прав для статуса', show_alert: true })
+        return
+    }
+
+    if (task.status === nextStatus) {
+        await ctx.answerCallbackQuery({ text: 'Статус уже установлен' })
+        return
+    }
+
+    const data: Prisma.TaskUpdateInput = {
+        status: nextStatus,
+        statusChangedAt: new Date(),
+        completedAt: nextStatus === 'DONE' ? new Date() : null,
+    }
+
+    const updated = await prisma.task.update({
+        where: { id: task.id },
+        data,
+        include: { assignee: true, creator: true },
+    })
+
+    await ctx.answerCallbackQuery({ text: `Статус: ${STATUS_LABELS[nextStatus]}` })
+    await sendTaskDetails(ctx, updated, { edit: true })
+}
+
+async function beginDeadlineAdjustment(ctx: BotContext, taskId: number, options: { requireReason: boolean }) {
+    const task = await fetchTaskWithRelations(taskId)
+    if (!task) {
+        await ctx.answerCallbackQuery({ text: 'Задача не найдена', show_alert: true })
+        return
+    }
+
+    if (!canAccessTask(task, ctx.user)) {
+        await ctx.answerCallbackQuery({ text: 'Нет доступа к задаче', show_alert: true })
+        return
+    }
+
+    pendingTaskDeadlineAdjustments.set(ctx.from!.id, {
+        taskId: task.id,
+        stage: options.requireReason ? 'reason' : 'deadline',
+        initiatedByManager: !options.requireReason,
+    })
+
+    if (options.requireReason) {
+        await ctx.reply('Опишите причину просрочки текстом. После этого я попрошу новый дедлайн.')
+    } else {
+        await ctx.reply('Отправьте новый дедлайн в формате YYYY-MM-DD или DD.MM.YYYY.')
+    }
+
+    await ctx.answerCallbackQuery()
+}
+
+async function completeDeadlineAdjustment(
+    ctx: BotContext,
+    entry: { taskId: number; stage: 'reason' | 'deadline'; reason?: string; initiatedByManager: boolean },
+    newDeadline: Date
+) {
+    const task = await fetchTaskWithRelations(entry.taskId)
+    if (!task) {
+        pendingTaskDeadlineAdjustments.delete(ctx.from!.id)
+        await ctx.reply('Задача не найдена. Попробуйте начать сначала.')
+        return
+    }
+
+    if (!canAccessTask(task, ctx.user)) {
+        pendingTaskDeadlineAdjustments.delete(ctx.from!.id)
+        await ctx.reply('У вас больше нет доступа к этой задаче.')
+        return
+    }
+
+    const normalizedDeadline = normalizeStartOfUtcDay(newDeadline)
+    const updates: Prisma.TaskUpdateInput = {
+        deadline: normalizedDeadline,
+        lastDailyReminderAt: null,
+        lastDeadlineReminderAt: null,
+        deadlineDayNotifiedAt: null,
+        overdueNotifiedAt: null,
+        managerOverdueNotifiedAt: null,
+        overdueReason: entry.reason ?? null,
+    }
+
+    let statusReset = false
+    if (task.status === 'OVERDUE') {
+        updates.status = 'IN_PROGRESS'
+        updates.statusChangedAt = new Date()
+        statusReset = true
+    }
+
+    const updated = await prisma.task.update({
+        where: { id: task.id },
+        data: updates,
+        include: { assignee: true, creator: true },
+    })
+
+    pendingTaskDeadlineAdjustments.delete(ctx.from!.id)
+
+    const deadlineText = formatDeadlineForDisplay(normalizedDeadline)
+    const statusNote = statusReset ? ' Статус возвращён в «В работе».' : ''
+    await ctx.reply(`Дедлайн обновлён: ${deadlineText}.${statusNote}`)
+    await sendTaskDetails(ctx, updated)
+
+    if (entry.reason && updated.creatorId !== ctx.user.id) {
+        const actorName = ctx.user.name || ctx.from?.first_name || `ID ${ctx.user.id.toString()}`
+        const notification = [
+            `Задача "${updated.title}" получила новый дедлайн (${deadlineText}).`,
+            `Исполнитель ${actorName} пояснил причину: ${entry.reason}`,
+        ].join('\n')
+        try {
+            await bot.api.sendMessage(Number(updated.creatorId), notification)
+        } catch (error) {
+            console.error('Failed to notify creator about overdue reason', error)
+        }
+    }
 }
 
 function buildTaskListMessage(tasks: AttachmentTaskSummary[], page: number): string {
-    const header = `Актуальные задачи (страница ${page + 1}):`
+    const header = `Актуальные задачи (страница ${page + 1})`
     const lines = tasks.map((task) => `#${task.id} · ${task.title} (${formatStatus(task.status)})`)
     return `${header}\n${lines.join('\n')}\n\nЧтобы прикрепить файл, выберите задачу ниже:`
 }
@@ -634,6 +906,12 @@ bot.command('start', (ctx) => ctx.reply('Welcome! Send me a task description.', 
 bot.hears('Мои задачи', async (ctx) => {
     if (!ctx.from) return
 
+    await sendTaskOverview(ctx)
+})
+
+bot.hears('Прикрепить файл', async (ctx) => {
+    if (!ctx.from) return
+
     await sendAttachmentTaskList(ctx)
 })
 
@@ -645,6 +923,32 @@ bot.on('message:text', async (ctx) => {
 
     const userId = ctx.from.id
     const pendingDeadline = pendingDeadlineRequests.get(userId)
+    const pendingAdjustment = pendingTaskDeadlineAdjustments.get(userId)
+
+    if (pendingAdjustment) {
+        if (pendingAdjustment.stage === 'reason') {
+            if (!text) {
+                await ctx.reply('Причина не может быть пустой. Попробуйте ещё раз.')
+                return
+            }
+            pendingTaskDeadlineAdjustments.set(userId, {
+                ...pendingAdjustment,
+                stage: 'deadline',
+                reason: text,
+            })
+            await ctx.reply('Спасибо. Теперь отправьте новый дедлайн (YYYY-MM-DD или DD.MM.YYYY).')
+            return
+        }
+
+        const parsedDeadline = parseUserDeadlineInput(text)
+        if (!parsedDeadline) {
+            await ctx.reply(DEADLINE_INVALID_MESSAGE)
+            return
+        }
+
+        await completeDeadlineAdjustment(ctx, pendingAdjustment, parsedDeadline)
+        return
+    }
 
     if (pendingDeadline) {
         const parsedDeadline = extractDeadlineFromText(text)
@@ -693,6 +997,66 @@ bot.on('callback_query:data', async (ctx) => {
 
     if (!data || !ctx.from) {
         await ctx.answerCallbackQuery()
+        return
+    }
+
+    if (data.startsWith('task-view:')) {
+        const [, taskIdRaw] = data.split(':')
+        const taskId = Number(taskIdRaw)
+        if (!Number.isInteger(taskId)) {
+            await ctx.answerCallbackQuery({ text: 'Некорректный ID задачи', show_alert: true })
+            return
+        }
+
+        const task = await fetchTaskWithRelations(taskId)
+        if (!task) {
+            await ctx.answerCallbackQuery({ text: 'Задача не найдена', show_alert: true })
+            return
+        }
+
+        if (!canAccessTask(task, ctx.user)) {
+            await ctx.answerCallbackQuery({ text: 'Нет доступа к задаче', show_alert: true })
+            return
+        }
+
+        await sendTaskDetails(ctx, task)
+        await ctx.answerCallbackQuery()
+        return
+    }
+
+    if (data.startsWith('task-status:')) {
+        const [, taskIdRaw, statusRaw] = data.split(':')
+        const taskId = Number(taskIdRaw)
+        if (!Number.isInteger(taskId) || !statusRaw) {
+            await ctx.answerCallbackQuery({ text: 'Некорректный запрос', show_alert: true })
+            return
+        }
+
+        await handleTaskStatusChange(ctx, taskId, statusRaw as TaskStatus)
+        return
+    }
+
+    if (data.startsWith('task-deadline:')) {
+        const [, taskIdRaw] = data.split(':')
+        const taskId = Number(taskIdRaw)
+        if (!Number.isInteger(taskId)) {
+            await ctx.answerCallbackQuery({ text: 'Некорректный ID задачи', show_alert: true })
+            return
+        }
+
+        await beginDeadlineAdjustment(ctx, taskId, { requireReason: ctx.user.role !== 'MANAGER' })
+        return
+    }
+
+    if (data.startsWith('task-overdue:')) {
+        const [, taskIdRaw] = data.split(':')
+        const taskId = Number(taskIdRaw)
+        if (!Number.isInteger(taskId)) {
+            await ctx.answerCallbackQuery({ text: 'Некорректный ID задачи', show_alert: true })
+            return
+        }
+
+        await beginDeadlineAdjustment(ctx, taskId, { requireReason: true })
         return
     }
 

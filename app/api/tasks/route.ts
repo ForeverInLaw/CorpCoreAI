@@ -1,26 +1,8 @@
 import { NextResponse } from 'next/server'
+
 import { prisma } from '@/lib/db'
 import { validateTelegramWebAppData } from '@/lib/auth'
 import { ensureTelegramUser, isWhitelistedTelegramId } from '@/lib/users'
-
-function serializeBigInts<T>(input: T): T {
-    if (typeof input === 'bigint') {
-        return input.toString() as T
-    }
-
-    if (Array.isArray(input)) {
-        return input.map(item => serializeBigInts(item)) as T
-    }
-
-    if (input !== null && typeof input === 'object') {
-        return Object.entries(input).reduce((acc, [key, value]) => {
-            acc[key as keyof T] = serializeBigInts(value)
-            return acc
-        }, {} as Record<keyof T, T[keyof T]>) as T
-    }
-
-    return input
-}
 
 export async function GET(request: Request) {
     const initData = request.headers.get('Authorization')
@@ -76,16 +58,20 @@ export async function GET(request: Request) {
             orderBy: { createdAt: 'desc' }
         })
 
-        const serializedTasks = tasks.map(task => serializeBigInts({
-            ...task,
+        const serializedTasks = tasks.map((task) => ({
             id: task.id.toString(),
-            creatorId: task.creatorId.toString(),
-            assigneeId: task.assigneeId?.toString(),
-            assigneeName: task.assignee?.name ?? null,
-            creatorName: task.creator?.name ?? null,
+            title: task.title,
+            description: task.description,
+            status: task.status,
+            deadline: task.deadline ? task.deadline.toISOString() : null,
+            subtasks: task.subtasks as string[] | null,
             createdAt: task.createdAt.toISOString(),
             updatedAt: task.updatedAt.toISOString(),
-            deadline: task.deadline ? task.deadline.toISOString() : null,
+            creatorId: task.creatorId.toString(),
+            creatorName: task.creator?.name ?? null,
+            assigneeId: task.assigneeId?.toString() ?? null,
+            assigneeName: task.assignee?.name ?? null,
+            overdueReason: task.overdueReason ?? null,
             attachments: task.attachments.map((attachment) => ({
                 id: attachment.id.toString(),
                 url: attachment.url,

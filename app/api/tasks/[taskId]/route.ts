@@ -8,6 +8,23 @@ import { bot } from '@/lib/bot'
 
 const EMPLOYEE_FORBIDDEN_STATUSES = new Set<TaskStatus>(['CLOSED'])
 const VALID_STATUS_VALUES = new Set<TaskStatus>(Object.values(TaskStatus))
+const STATUS_LABELS: Record<TaskStatus, string> = {
+  IN_PROGRESS: 'в работе',
+  DONE: 'готово',
+  PAUSED: 'на паузе',
+  OVERDUE: 'просрочена',
+  CLOSED: 'закрыта',
+}
+
+async function sendTelegramNotification(userId: bigint | null | undefined, message: string) {
+  if (!userId) return
+
+  try {
+    await bot.api.sendMessage(Number(userId), message)
+  } catch (error) {
+    console.error('Failed to send Telegram notification', { userId: userId.toString(), error })
+  }
+}
 
 function canModifyTask(
   task: { creatorId: bigint; assigneeId: bigint | null },
@@ -212,6 +229,48 @@ export async function PATCH(
     } catch (error) {
       console.error('Failed to notify newly assigned user', error)
     }
+  }
+
+  const notificationJobs: Promise<void>[] = []
+  const statusChanged = nextStatus && nextStatus !== task.status
+
+  if (statusChanged && nextStatus) {
+    const actorName = telegramUser.name ?? `ID ${telegramUser.id.toString()}`
+    const statusLabel = STATUS_LABELS[nextStatus] ?? nextStatus
+    const baseText = `Статус задачи "${updatedTask.title}" изменён на «${statusLabel}». Инициатор: ${actorName}.`
+
+    const notifyCreator = telegramUser.id !== updatedTask.creatorId
+    const notifyAssignee = updatedTask.assigneeId && telegramUser.id !== updatedTask.assigneeId
+
+    if (notifyCreator) {
+      let creatorText = baseText
+      if (nextStatus === TaskStatus.DONE && telegramUser.role !== 'MANAGER') {
+        creatorText += '\nПроверьте результат: вы можете подтвердить выполнение или вернуть задачу.'
+      }
+      notificationJobs.push(sendTelegramNotification(updatedTask.creatorId, creatorText))
+    }
+
+    if (notifyAssignee) {
+      let assigneeText = baseText
+      if (nextStatus === TaskStatus.OVERDUE) {
+        assigneeText +=
+          '\nЗадача просрочена: укажите новый срок, завершите её или поставьте на паузу как можно скорее.'
+      }
+      notificationJobs.push(sendTelegramNotification(updatedTask.assigneeId, assigneeText))
+    }
+
+    if (nextStatus === TaskStatus.OVERDUE && updatedTask.assigneeId && !notifyAssignee) {
+      notificationJobs.push(
+        sendTelegramNotification(
+          updatedTask.assigneeId,
+          `Задача "${updatedTask.title}" помечена как просроченная. Укажите новый срок, завершите задачу или поставьте её на паузу.`,
+        ),
+      )
+    }
+  }
+
+  if (notificationJobs.length > 0) {
+    await Promise.all(notificationJobs)
   }
 
   return NextResponse.json({

@@ -20,6 +20,7 @@ interface Task {
   assigneeName?: string | null
   creatorId: string
   creatorName?: string | null
+  overdueReason?: string | null
   attachments?: Attachment[]
 }
 
@@ -429,6 +430,11 @@ export default function Home() {
                           {new Date(task.deadline) < new Date() && task.status !== 'DONE' && (
                             <Badge variant="destructive" className="text-xs">Overdue</Badge>
                           )}
+                        </span>
+                      )}
+                      {task.overdueReason && (
+                        <span className="text-sm text-destructive/80 mt-1">
+                          Reason: {task.overdueReason}
                         </span>
                       )}
                     </CardDescription>

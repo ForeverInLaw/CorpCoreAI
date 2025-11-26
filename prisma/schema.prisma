@@ -51,6 +51,7 @@ model Task {
   deadlineDayNotifiedAt    DateTime?
   overdueNotifiedAt        DateTime?
   managerOverdueNotifiedAt DateTime?
+  overdueReason            String?
 
   creatorId   BigInt
   creator     User     @relation("CreatedTasks", fields: [creatorId], references: [id])
