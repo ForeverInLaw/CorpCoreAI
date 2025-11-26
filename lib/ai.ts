@@ -10,6 +10,7 @@ const openai = new OpenAI({
 })
 
 const THINK_TAG_PATTERN = /<think>[\s\S]*?<\/think>/gi
+const MAX_PARSE_TASK_ATTEMPTS = 2
 
 function extractJsonObject(raw: string) {
     let cleaned = raw.replaceAll(THINK_TAG_PATTERN, '').trim()
@@ -40,45 +41,71 @@ function extractJsonObject(raw: string) {
     throw new Error('AI response was not valid JSON')
 }
 
-export async function parseTask(text: string) {
-    const completion = await openai.chat.completions.create({
-        model: "minimaxai/minimax-m2",
-        messages: [
-            {
-                role: "system",
-                content: "You are a helpful assistant that parses task descriptions. Extract a short title (max 70 chars) and a list of subtasks from the user's text. Return JSON format: { \"title\": \"...\", \"subtasks\": [\"...\", \"...\"] }. If no subtasks are explicit, generate reasonable ones."
-            },
-            { role: "user", content: text }
-        ],
-        temperature: 0.7,
-        max_tokens: 1024,
-        response_format: { type: "json_object" }
-    })
+type ParsedTaskPayload = {
+    title: string
+    subtasks: string[]
+    deadline: string | null
+}
 
-    const content = completion.choices[0]?.message?.content
-    if (!content) throw new Error('No content from AI')
+export async function parseTask(text: string, referenceDate: Date = new Date()): Promise<ParsedTaskPayload> {
+    let lastError: unknown = null
+    const referenceDateIso = referenceDate.toISOString().split('T')[0]
 
-    try {
-        const parsed = extractJsonObject(content)
+    for (let attempt = 1; attempt <= MAX_PARSE_TASK_ATTEMPTS; attempt++) {
+        try {
+            const completion = await openai.chat.completions.create({
+                model: "minimaxai/minimax-m2",
+                messages: [
+                    {
+                        role: "system",
+                        content: `You are a helpful assistant that parses Russian task descriptions. You don't do these tasks, only parse. Return ONLY JSON: { "title": string (<=70 chars), "subtasks": string[], "deadline": "YYYY-MM-DD" | null }. Use today's date ${referenceDateIso} when interpreting phrases like "в пятницу" or "через 3 дня" and always pick the nearest future date. If deadline is missing, set it to null.`
+                    },
+                    { role: "user", content: text }
+                ],
+                temperature: 0.7,
+                max_tokens: 8192,
+                response_format: { type: "json_object" }
+            })
 
-        if (typeof parsed.title !== 'string') {
-            throw new TypeError('Title missing in AI response')
-        }
-
-        if (!Array.isArray(parsed.subtasks)) {
-            throw new TypeError('Subtasks missing in AI response')
-        }
-
-        const subtasks = parsed.subtasks.map((subtask: unknown) => {
-            if (typeof subtask !== 'string') {
-                throw new TypeError('Subtask entry is not a string')
+            const content = completion.choices[0]?.message?.content
+            if (!content) {
+                throw new Error('No content from AI')
             }
-            return subtask
-        })
 
-        return { title: parsed.title, subtasks }
-    } catch (e) {
-        console.error('Failed to parse AI response:', content)
-        throw e
+            try {
+                const parsed = extractJsonObject(content)
+
+                if (typeof parsed.title !== 'string') {
+                    throw new TypeError('Title missing in AI response')
+                }
+
+                if (!Array.isArray(parsed.subtasks)) {
+                    throw new TypeError('Subtasks missing in AI response')
+                }
+
+                const subtasks = parsed.subtasks.map((subtask: unknown) => {
+                    if (typeof subtask !== 'string') {
+                        throw new TypeError('Subtask entry is not a string')
+                    }
+                    return subtask
+                })
+
+                const deadline = typeof parsed.deadline === 'string' ? parsed.deadline : null
+
+                return { title: parsed.title, subtasks, deadline }
+            } catch (parseError) {
+                console.error(`Failed to parse AI response on attempt ${attempt}:`, content)
+                throw parseError
+            }
+        } catch (error) {
+            lastError = error
+            console.error(`parseTask attempt ${attempt} failed with error:`, error)
+
+            if (attempt === MAX_PARSE_TASK_ATTEMPTS) {
+                throw error
+            }
+        }
     }
+
+    throw lastError instanceof Error ? lastError : new Error('Failed to parse task')
 }

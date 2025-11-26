@@ -1,38 +1,392 @@
-import { Bot, Context } from 'grammy'
+import { Bot, Context, InlineKeyboard } from 'grammy'
+import type { User } from '@prisma/client'
 import { prisma } from '../db'
 import { parseTask } from '../ai'
+import { ensureTelegramUser } from '../users'
 
 if (!process.env.BOT_TOKEN) {
     throw new Error('BOT_TOKEN is not defined')
 }
 
-export const bot = new Bot(process.env.BOT_TOKEN)
+function parseIsoDeadline(deadlineIso: string): Date | null {
+    const match = deadlineIso.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (!match) {
+        return null
+    }
+
+    const [, yearRaw, monthRaw, dayRaw] = match
+    const candidate = createUtcDate(Number(yearRaw), Number(monthRaw), Number(dayRaw))
+    if (!candidate) {
+        return null
+    }
+
+    return ensureFutureOrToday(candidate)
+}
+
+type BotContext = Context & { user: User }
+
+export const bot: Bot<BotContext> = new Bot(process.env.BOT_TOKEN)
+
+const whitelist = new Set(
+    (process.env.WHITELIST || '')
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean)
+        .map(Number)
+        .filter((id) => !Number.isNaN(id))
+)
+
+type TaskDraftBase = {
+    title: string
+    description: string
+    subtasks: string[]
+}
+
+type TaskDraftWithDeadline = TaskDraftBase & {
+    deadline: Date
+}
+
+const pendingManagerTasks = new Map<number, TaskDraftWithDeadline>()
+const pendingDeadlineRequests = new Map<number, TaskDraftBase>()
+
+const DEADLINE_PROMPT_MESSAGE = 'Дедлайн не найден. Пожалуйста, отправьте дату в формате YYYY-MM-DD или DD.MM.YYYY (. / допускается).'
+const DEADLINE_INVALID_MESSAGE = 'Не удалось распознать дату или она уже прошла. Укажите дедлайн в формате YYYY-MM-DD или DD.MM.YYYY.'
+
+const MONTH_NAME_MAP: Record<string, number> = {
+    января: 1,
+    январь: 1,
+    янв: 1,
+    февраля: 2,
+    февраль: 2,
+    фев: 2,
+    марта: 3,
+    март: 3,
+    мар: 3,
+    апреля: 4,
+    апрель: 4,
+    апр: 4,
+    мая: 5,
+    май: 5,
+    июн: 6,
+    июня: 6,
+    июль: 7,
+    июля: 7,
+    июл: 7,
+    августа: 8,
+    август: 8,
+    авг: 8,
+    сентября: 9,
+    сентябрь: 9,
+    сен: 9,
+    октября: 10,
+    октябрь: 10,
+    окт: 10,
+    ноября: 11,
+    ноябрь: 11,
+    ноя: 11,
+    декабря: 12,
+    декабрь: 12,
+    дек: 12,
+}
+
+const WEEKDAY_NAME_MAP: Record<string, number> = {
+    понедельник: 1,
+    понедельника: 1,
+    пн: 1,
+    вторник: 2,
+    вторника: 2,
+    вт: 2,
+    среда: 3,
+    среды: 3,
+    среду: 3,
+    ср: 3,
+    четверг: 4,
+    четверга: 4,
+    чт: 4,
+    пятница: 5,
+    пятницы: 5,
+    пятницу: 5,
+    пт: 5,
+    суббота: 6,
+    субботы: 6,
+    сб: 6,
+    воскресенье: 0,
+    воскресенья: 0,
+    вс: 0,
+}
+
+function formatDeadlineForDisplay(date: Date): string {
+    const year = date.getUTCFullYear()
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+    const day = String(date.getUTCDate()).padStart(2, '0')
+    return `${day}.${month}.${year}`
+}
+
+function createUtcDate(year: number, month: number, day: number): Date | null {
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null
+    const date = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
+    if (
+        date.getUTCFullYear() !== year ||
+        date.getUTCMonth() !== month - 1 ||
+        date.getUTCDate() !== day
+    ) {
+        return null
+    }
+    return date
+}
+
+function ensureFutureOrToday(date: Date): Date | null {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const normalized = new Date(date)
+    return normalized >= today ? normalized : null
+}
+
+function extractDeadlineFromText(text: string): Date | null {
+    const isoMatch = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/)
+    if (isoMatch) {
+        const [, yearRaw, monthRaw, dayRaw] = isoMatch
+        const candidate = createUtcDate(Number(yearRaw), Number(monthRaw), Number(dayRaw))
+        if (candidate) {
+            const valid = ensureFutureOrToday(candidate)
+            if (valid) return valid
+        }
+    }
+
+    const dmyMatch = text.match(/\b(\d{1,2})[./](\d{1,2})[./](\d{4})\b/)
+    if (dmyMatch) {
+        const [, dayRaw, monthRaw, yearRaw] = dmyMatch
+        const candidate = createUtcDate(Number(yearRaw), Number(monthRaw), Number(dayRaw))
+        if (candidate) {
+            const valid = ensureFutureOrToday(candidate)
+            if (valid) return valid
+        }
+    }
+
+    const dmMatch = text.match(/\b(\d{1,2})[./](\d{1,2})\b/)
+    if (dmMatch) {
+        const [, dayRaw, monthRaw] = dmMatch
+        const now = new Date()
+        let year = now.getUTCFullYear()
+        let candidate = createUtcDate(year, Number(monthRaw), Number(dayRaw))
+        if (candidate) {
+            if (ensureFutureOrToday(candidate)) {
+                return candidate
+            }
+            candidate = createUtcDate(year + 1, Number(monthRaw), Number(dayRaw))
+            if (candidate) {
+                const valid = ensureFutureOrToday(candidate)
+                if (valid) return valid
+            }
+        }
+    }
+
+    const relative = extractRelativeDeadline(text)
+    if (relative) {
+        return relative
+    }
+
+    return null
+}
+
+function extractRelativeDeadline(rawText: string): Date | null {
+    const text = rawText.toLowerCase()
+    const today = new Date()
+    today.setUTCHours(0, 0, 0, 0)
+
+    if (/(сегодня)/i.test(text)) {
+        return new Date(today)
+    }
+
+    if (/(завтра)/i.test(text)) {
+        return addUtcDays(today, 1)
+    }
+
+    if (/(послезавтра)/i.test(text)) {
+        return addUtcDays(today, 2)
+    }
+
+    const inDaysMatch = text.match(/через\s+(\d+)\s+(дн(?:я|ей)|дня|дней)/)
+    if (inDaysMatch) {
+        const daysAhead = Number(inDaysMatch[1])
+        if (!Number.isNaN(daysAhead) && daysAhead >= 0) {
+            return addUtcDays(today, daysAhead)
+        }
+    }
+
+    const inWeeksMatch = text.match(/через\s+(\d+)\s+недел(?:ю|и)/)
+    if (inWeeksMatch) {
+        const weeksAhead = Number(inWeeksMatch[1])
+        if (!Number.isNaN(weeksAhead) && weeksAhead >= 0) {
+            return addUtcDays(today, weeksAhead * 7)
+        }
+    }
+
+    const weekdayMatch = text.match(/\b(?:до|к|на|в)\s+(понедельника|понедельник|пн|вторника|вторник|вт|сред[ауы]|ср|четверг|четверга|чт|пятниц[ауы]?|пт|суббот[ауы]?|сб|воскресень[ея]|вс)\b/)
+    if (weekdayMatch) {
+        const weekdayRaw = weekdayMatch[1]
+        const weekdayIndex = WEEKDAY_NAME_MAP[weekdayRaw as keyof typeof WEEKDAY_NAME_MAP]
+        if (weekdayIndex !== undefined) {
+            return getUpcomingWeekday(today, weekdayIndex)
+        }
+    }
+
+    const monthMatch = text.match(/\b(?:до|к|на)?\s*(\d{1,2})\s+(январ[ья]|феврал[ья]|марта?|апрел[ья]|мая|июн[ья]|июл[ья]|авгус[та]?|сентябр[ья]|октябр[ья]|ноябр[ья]|декабр[ья])\b/)
+    if (monthMatch) {
+        const day = Number(monthMatch[1])
+        const monthName = monthMatch[2]
+        const month = MONTH_NAME_MAP[monthName as keyof typeof MONTH_NAME_MAP]
+        if (!Number.isNaN(day) && month) {
+            const date = createDateWithMonthName(today, day, month)
+            if (date) return date
+        }
+    }
+
+    if (/через\s+несколько\s+дней/.test(text)) {
+        return addUtcDays(today, 3)
+    }
+
+    if (/(после\s+завтра)/.test(text)) {
+        return addUtcDays(today, 2)
+    }
+
+    return null
+}
+
+function createDateWithMonthName(reference: Date, day: number, month: number): Date | null {
+    const candidate = createUtcDate(reference.getUTCFullYear(), month, day)
+    if (!candidate) return null
+
+    const valid = ensureFutureOrToday(candidate)
+    if (valid) {
+        return valid
+    }
+
+    return createUtcDate(reference.getUTCFullYear() + 1, month, day)
+}
+
+function getUpcomingWeekday(reference: Date, targetWeekday: number): Date {
+    const currentWeekday = reference.getUTCDay()
+    let diff = (targetWeekday - currentWeekday + 7) % 7
+    if (diff === 0) {
+        diff = 7
+    }
+    return addUtcDays(reference, diff)
+}
+
+function addUtcDays(reference: Date, days: number): Date {
+    const clone = new Date(reference)
+    clone.setUTCDate(clone.getUTCDate() + days)
+    clone.setUTCHours(0, 0, 0, 0)
+    return clone
+}
+
+async function handleDraftWithDeadline(ctx: BotContext, draft: TaskDraftWithDeadline) {
+    if (!ctx.from) {
+        return
+    }
+
+    const userId = ctx.from.id
+    if (ctx.user.role === 'MANAGER') {
+        const employees = await prisma.user.findMany({
+            where: { role: 'EMPLOYEE' },
+            orderBy: [{ name: 'asc' }],
+            take: 25,
+        })
+
+        if (employees.length === 0) {
+            await ctx.reply('No employees found. Assigning task to you by default.')
+            await createTaskForAssignee(ctx, draft, BigInt(userId))
+            return
+        }
+
+        pendingManagerTasks.set(userId, draft)
+
+        const keyboard = new InlineKeyboard()
+
+        employees.forEach((employee, index) => {
+            const label = employee.name || `ID ${employee.id.toString()}`
+            keyboard.text(label, `assign:${employee.id.toString()}`)
+            if ((index + 1) % 2 === 0) {
+                keyboard.row()
+            }
+        })
+
+        keyboard.text('Assign to me', 'assign:self').row()
+        keyboard.text('Cancel', 'assign:cancel')
+
+        await ctx.reply(
+            'Select an assignee for the task (or choose “Assign to me”).',
+            { reply_markup: keyboard }
+        )
+        return
+    }
+
+    await createTaskForAssignee(ctx, draft, BigInt(userId))
+}
+
+async function createTaskForAssignee(ctx: BotContext, draft: TaskDraftWithDeadline, assigneeId: bigint) {
+    if (!ctx.from) {
+        return
+    }
+
+    const creatorId = BigInt(ctx.from.id)
+    const task = await prisma.task.create({
+        data: {
+            title: draft.title,
+            description: draft.description,
+            creatorId,
+            assigneeId,
+            subtasks: draft.subtasks,
+            status: 'IN_PROGRESS',
+            deadline: draft.deadline,
+        },
+    })
+
+    const subtaskList = draft.subtasks.map((s: string) => `- ${s}`).join('\n') || '—'
+    const message = `Task created!\n\n*${task.title}*\nDeadline: ${formatDeadlineForDisplay(draft.deadline)}\n\nSubtasks:\n${subtaskList}`
+
+    await ctx.reply(message, { parse_mode: 'Markdown' })
+}
+
+function parseAssigneeId(raw: string): bigint | null {
+    if (!/^\d+$/.test(raw)) {
+        return null
+    }
+    try {
+        return BigInt(raw)
+    } catch {
+        return null
+    }
+}
 
 // Whitelist Middleware
 bot.use(async (ctx, next) => {
     const userId = ctx.from?.id
     if (!userId) return
 
-    const whitelist = (process.env.WHITELIST || '').split(',').map(id => Number(id.trim()))
+    const userBigInt = BigInt(userId)
+    let user = await prisma.user.findUnique({ where: { id: userBigInt } })
 
-    // Check if user is in DB or whitelist
-    let user = await prisma.user.findUnique({ where: { id: userId } })
-
-    if (!user) {
-        if (whitelist.includes(userId)) {
-            // Auto-register whitelisted user
-            user = await prisma.user.create({
-                data: {
-                    id: userId,
-                    name: ctx.from?.first_name,
-                    role: 'EMPLOYEE' // Default role
-                }
-            })
-        } else {
+    if (user) {
+        user = await ensureTelegramUser({
+            id: userId,
+            name: ctx.from?.first_name,
+        })
+    } else {
+        if (!whitelist.has(userId)) {
             await ctx.reply('Access denied. You are not on the whitelist.')
             return
         }
+
+        user = await ensureTelegramUser({
+            id: userId,
+            name: ctx.from?.first_name,
+        })
     }
+
+    ctx.user = user
 
     await next()
 })
@@ -40,29 +394,134 @@ bot.use(async (ctx, next) => {
 bot.command('start', (ctx) => ctx.reply('Welcome! Send me a task description.'))
 
 bot.on('message:text', async (ctx) => {
-    const text = ctx.message.text
+    if (!ctx.from) return
+
+    const text = ctx.message.text?.trim()
+    if (!text) return
+
     const userId = ctx.from.id
+    const pendingDeadline = pendingDeadlineRequests.get(userId)
+
+    if (pendingDeadline) {
+        const parsedDeadline = extractDeadlineFromText(text)
+        if (!parsedDeadline) {
+            await ctx.reply(DEADLINE_INVALID_MESSAGE)
+            return
+        }
+
+        pendingDeadlineRequests.delete(userId)
+        await handleDraftWithDeadline(ctx, {
+            ...pendingDeadline,
+            deadline: parsedDeadline,
+        })
+        return
+    }
 
     await ctx.reply('Analyzing task...')
 
     try {
-        const { title, subtasks } = await parseTask(text)
+        const { title, subtasks, deadline: aiDeadline } = await parseTask(text)
+        let detectedDeadline = aiDeadline ? parseIsoDeadline(aiDeadline) : null
+        if (!detectedDeadline) {
+            detectedDeadline = extractDeadlineFromText(text)
+        }
+        const draft: TaskDraftBase = {
+            title,
+            description: text,
+            subtasks,
+        }
 
-        const task = await prisma.task.create({
-            data: {
-                title,
-                description: text,
-                creatorId: userId,
-                assigneeId: userId, // Self-assign by default
-                subtasks: subtasks,
-                status: 'IN_PROGRESS'
-            }
-        })
+        if (!detectedDeadline) {
+            pendingDeadlineRequests.set(userId, draft)
+            await ctx.reply(DEADLINE_PROMPT_MESSAGE)
+            return
+        }
 
-        await ctx.reply(`Task created!\n\n*${task.title}*\n\nSubtasks:\n${subtasks.map((s: string) => `- ${s}`).join('\n')}`, { parse_mode: 'Markdown' })
+        await handleDraftWithDeadline(ctx, { ...draft, deadline: detectedDeadline })
     } catch (error) {
         console.error(error)
         await ctx.reply('Failed to create task. Please try again.')
+    }
+})
+
+bot.on('callback_query:data', async (ctx) => {
+    const data = ctx.callbackQuery.data
+    if (!data?.startsWith('assign:')) {
+        await ctx.answerCallbackQuery()
+        return
+    }
+
+    if (!ctx.from) {
+        await ctx.answerCallbackQuery({ text: 'Unexpected error.', show_alert: true })
+        return
+    }
+
+    const managerId = ctx.from.id
+    const pending = pendingManagerTasks.get(managerId)
+
+    if (!pending) {
+        await ctx.answerCallbackQuery({ text: 'No pending task to assign.', show_alert: true })
+        return
+    }
+
+    if (data === 'assign:cancel') {
+        pendingManagerTasks.delete(managerId)
+        await ctx.editMessageText('Task creation cancelled.')
+        await ctx.answerCallbackQuery({ text: 'Cancelled' })
+        return
+    }
+
+    let assigneeId: bigint
+
+    if (data === 'assign:self') {
+        assigneeId = BigInt(managerId)
+    } else {
+        const [, rawId] = data.split(':')
+        const parsedId = parseAssigneeId(rawId)
+        if (!parsedId) {
+            await ctx.answerCallbackQuery({ text: 'Invalid assignee.', show_alert: true })
+            return
+        }
+        assigneeId = parsedId
+    }
+
+    const assignee = await prisma.user.findUnique({ where: { id: assigneeId } })
+
+    if (!assignee) {
+        await ctx.answerCallbackQuery({ text: 'Selected assignee not found.', show_alert: true })
+        return
+    }
+
+    try {
+        const task = await prisma.task.create({
+            data: {
+                title: pending.title,
+                description: pending.description,
+                creatorId: BigInt(managerId),
+                assigneeId,
+                subtasks: pending.subtasks,
+                status: 'IN_PROGRESS',
+                deadline: pending.deadline,
+            }
+        })
+
+        pendingManagerTasks.delete(managerId)
+
+        await ctx.editMessageText(
+            `Task "${task.title}" assigned to ${assignee.name || assignee.id.toString()} (deadline ${formatDeadlineForDisplay(pending.deadline)}).`
+        )
+
+        await ctx.answerCallbackQuery({ text: 'Task assigned' })
+
+        if (assignee.id !== BigInt(managerId)) {
+            await bot.api.sendMessage(
+                Number(assignee.id),
+                `New task assigned by ${ctx.from.first_name || 'Manager'}:\n${task.title}\nDeadline: ${formatDeadlineForDisplay(pending.deadline)}`
+            )
+        }
+    } catch (error) {
+        console.error('Failed to assign task:', error)
+        await ctx.answerCallbackQuery({ text: 'Failed to create task.', show_alert: true })
     }
 })
 
