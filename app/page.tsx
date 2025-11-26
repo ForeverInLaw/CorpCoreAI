@@ -52,11 +52,11 @@ interface TasksResponse {
 }
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
-  IN_PROGRESS: 'In Progress',
-  DONE: 'Done',
-  PAUSED: 'Paused',
-  OVERDUE: 'Overdue',
-  CLOSED: 'Closed',
+  IN_PROGRESS: 'В работе',
+  DONE: 'Готово',
+  PAUSED: 'На паузе',
+  OVERDUE: 'Просрочено',
+  CLOSED: 'Закрыто',
 }
 
 const STATUS_OPTIONS = Object.entries(STATUS_LABELS).map(([value, label]) => ({
@@ -306,7 +306,7 @@ export default function Home() {
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+    return <div className="flex items-center justify-center min-h-screen">Загрузка...</div>
   }
 
   if (!isAuthorized) {
@@ -314,9 +314,9 @@ export default function Home() {
       <div className="flex items-center justify-center min-h-screen p-4 text-center">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle>Access Denied</CardTitle>
+            <CardTitle>Доступ запрещен</CardTitle>
             <CardDescription>
-              Please open this application from within Telegram.
+              Пожалуйста, откройте это приложение из Telegram.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -329,9 +329,9 @@ export default function Home() {
       <div className="flex items-center justify-center min-h-screen p-4 text-center">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle>Access Restricted</CardTitle>
+            <CardTitle>Доступ ограничен</CardTitle>
             <CardDescription>
-              Your Telegram account is not whitelisted for this workspace.
+              Ваш аккаунт Telegram не добавлен в белый список для этого рабочего пространства.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -344,12 +344,12 @@ export default function Home() {
       <div className="flex items-center justify-center min-h-screen p-4 text-center">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle>Something went wrong</CardTitle>
+            <CardTitle>Что-то пошло не так</CardTitle>
             <CardDescription>{fetchError}</CardDescription>
           </CardHeader>
           <CardContent>
             <Button onClick={() => fetchTasks((globalThis.window as any).Telegram.WebApp.initData)}>
-              Retry
+              Повторить
             </Button>
           </CardContent>
         </Card>
@@ -361,13 +361,13 @@ export default function Home() {
     <div className="container mx-auto p-4 max-w-3xl space-y-6">
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold">Task Manager</h1>
+          <h1 className="text-2xl font-bold">Менеджер задач</h1>
           {currentUser && (
-            <Badge variant="outline">{isManager ? 'Manager' : 'Employee'}</Badge>
+            <Badge variant="outline">{isManager ? 'Менеджер' : 'Сотрудник'}</Badge>
           )}
         </div>
         {currentUser?.name && (
-          <p className="text-muted-foreground text-sm">Signed in as {currentUser.name}</p>
+          <p className="text-muted-foreground text-sm">Вы вошли как {currentUser.name}</p>
         )}
       </div>
 
@@ -377,18 +377,18 @@ export default function Home() {
           disabled={loading}
           className="self-start"
         >
-          Refresh
+          Обновить
         </Button>
 
         {isManager && (
           <label className="flex flex-col gap-2 w-full sm:w-64 text-sm">
-            <span className="text-muted-foreground">Filter by assignee</span>
+            <span className="text-muted-foreground">Фильтр по исполнителю</span>
             <select
               className="border rounded-md px-3 py-2 bg-background"
               value={selectedAssignee}
               onChange={(event) => setSelectedAssignee(event.target.value)}
             >
-              <option value="all">All employees</option>
+              <option value="all">Все сотрудники</option>
               {employees.map((employee) => (
                 <option key={employee.id} value={employee.id}>
                   {employee.name}
@@ -411,7 +411,7 @@ export default function Home() {
         {Object.keys(STATUS_LABELS).map((status) => (
           <TabsContent key={status} value={status} className="mt-4 space-y-4">
             {filteredTasks.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">No tasks found.</p>
+              <p className="text-center text-muted-foreground py-8">Задачи не найдены.</p>
             ) : (
               filteredTasks.map(task => (
                 <Card key={task.id}>
@@ -423,18 +423,18 @@ export default function Home() {
                       </Badge>
                     </div>
                     <CardDescription className="flex flex-col gap-1">
-                      <span>Created: {new Date(task.createdAt).toLocaleDateString()}</span>
+                      <span>Создана: {new Date(task.createdAt).toLocaleDateString()}</span>
                       {task.deadline && (
                         <span className="flex items-center gap-2">
-                          Deadline: {formatDateUtc(task.deadline)}
+                          Дедлайн: {formatDateUtc(task.deadline)}
                           {new Date(task.deadline) < new Date() && task.status !== 'DONE' && (
-                            <Badge variant="destructive" className="text-xs">Overdue</Badge>
+                            <Badge variant="destructive" className="text-xs">Просрочено</Badge>
                           )}
                         </span>
                       )}
                       {task.overdueReason && (
                         <span className="text-sm text-destructive/80 mt-1">
-                          Reason: {task.overdueReason}
+                          Причина просрочки: {task.overdueReason}
                         </span>
                       )}
                     </CardDescription>
@@ -442,12 +442,12 @@ export default function Home() {
                   <CardContent>
                     <p className="whitespace-pre-wrap mb-4">{task.description}</p>
                     <div className="text-sm text-muted-foreground space-y-1 mb-4">
-                      <p>Creator: {task.creatorName ?? 'Unknown'}</p>
-                      <p>Assignee: {task.assigneeName ?? 'Not assigned'}</p>
+                      <p>Создатель: {task.creatorName ?? 'Неизвестно'}</p>
+                      <p>Исполнитель: {task.assigneeName ?? 'Не назначен'}</p>
                     </div>
                     {task.attachments && task.attachments.length > 0 && (
                       <div className="mb-4 text-sm">
-                        <p className="font-semibold mb-2">Attachments:</p>
+                        <p className="font-semibold mb-2">Вложения:</p>
                         <ul className="space-y-2">
                           {task.attachments.map((attachment) => (
                             <li key={attachment.id} className="flex flex-col">
@@ -458,11 +458,11 @@ export default function Home() {
                                 disabled={downloadingAttachmentId === attachment.id}
                               >
                                 {downloadingAttachmentId === attachment.id
-                                  ? 'Preparing link...'
+                                  ? 'Подготовка ссылки...'
                                   : attachment.fileName ?? attachment.type}
                               </button>
                               <span className="text-xs text-muted-foreground">
-                                {attachment.mimeType ?? 'Unknown type'} · {formatFileSize(attachment.sizeBytes)} ·
+                                {attachment.mimeType ?? 'Неизвестный тип'} · {formatFileSize(attachment.sizeBytes)} ·
                                 {' '}
                                 {new Date(attachment.createdAt).toLocaleString()}
                               </span>
@@ -477,7 +477,7 @@ export default function Home() {
                     <div className="space-y-4">
                       <div className="flex flex-col gap-2">
                         <label className="text-sm font-medium" htmlFor={`status-${task.id}`}>
-                          Status
+                          Статус
                         </label>
                         <select
                           id={`status-${task.id}`}
@@ -496,7 +496,7 @@ export default function Home() {
 
                       <div className="flex flex-col gap-2">
                         <label className="text-sm font-medium" htmlFor={`deadline-${task.id}`}>
-                          Deadline
+                          Дедлайн
                         </label>
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
                           <input
@@ -513,7 +513,7 @@ export default function Home() {
                             disabled={updatingTasks[task.id]}
                             onClick={() => handleDeadlineSave(task.id)}
                           >
-                            Save deadline
+                            Сохранить дедлайн
                           </Button>
                           {isManager && (
                             <Button
@@ -523,16 +523,14 @@ export default function Home() {
                               disabled={updatingTasks[task.id]}
                               onClick={() => handleDeadlineClear(task.id)}
                             >
-                              Clear deadline
+                              Удалить дедлайн
                             </Button>
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          Leave empty to remove deadline (managers only)
-                        </p>
+
                         {task.status === 'OVERDUE' && (
                           <p className="text-xs text-muted-foreground">
-                            Task is overdue — set a new deadline or update status.
+                            Задача просрочена — установите новый дедлайн или обновите статус.
                           </p>
                         )}
                       </div>
@@ -540,7 +538,7 @@ export default function Home() {
                       {isManager && (
                         <div className="flex flex-col gap-2">
                           <label className="text-sm font-medium" htmlFor={`assignee-${task.id}`}>
-                            Assignee
+                            Исполнитель
                           </label>
                           <select
                             id={`assignee-${task.id}`}
@@ -549,7 +547,7 @@ export default function Home() {
                             onChange={(event) => handleAssigneeChange(task.id, event.target.value)}
                             disabled={updatingTasks[task.id]}
                           >
-                            <option value="">Unassigned</option>
+                            <option value="">Не назначен</option>
                             {employees.map((employee) => (
                               <option key={employee.id} value={employee.id}>
                                 {employee.name}
@@ -568,7 +566,7 @@ export default function Home() {
                               onClick={() => fileInputRefs.current[task.id]?.click()}
                               disabled={uploadingTaskId === task.id}
                             >
-                              {uploadingTaskId === task.id ? 'Uploading...' : 'Attach file'}
+                              {uploadingTaskId === task.id ? 'Загрузка...' : 'Прикрепить файл'}
                             </Button>
                             <input
                               type="file"
@@ -589,7 +587,7 @@ export default function Home() {
                     </div>
                     {task.subtasks && Array.isArray(task.subtasks) && task.subtasks.length > 0 && (
                       <div className="bg-muted p-3 rounded-md text-sm">
-                        <p className="font-semibold mb-2">Subtasks:</p>
+                        <p className="font-semibold mb-2">Подзадачи:</p>
                         <ul className="list-disc list-inside space-y-1">
                           {task.subtasks.map((sub: string, index: number) => (
                             <li key={`${task.id}-${index}-${sub}`}>{sub}</li>

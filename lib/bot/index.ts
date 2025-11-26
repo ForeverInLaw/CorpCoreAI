@@ -806,7 +806,7 @@ async function handleDraftWithDeadline(ctx: BotContext, draft: TaskDraftWithDead
         })
 
         if (employees.length === 0) {
-            await ctx.reply('No employees found. Assigning task to you by default.')
+            await ctx.reply('Сотрудники не найдены. Задача назначена вам по умолчанию.')
             await createTaskForAssignee(ctx, draft, BigInt(userId))
             return
         }
@@ -823,11 +823,11 @@ async function handleDraftWithDeadline(ctx: BotContext, draft: TaskDraftWithDead
             }
         })
 
-        keyboard.text('Assign to me', 'assign:self').row()
-        keyboard.text('Cancel', 'assign:cancel')
+        keyboard.text('Назначить мне', 'assign:self').row()
+        keyboard.text('Отмена', 'assign:cancel')
 
         await ctx.reply(
-            'Select an assignee for the task (or choose “Assign to me”).',
+            'Выберите исполнителя для задачи (или «Назначить мне»).',
             { reply_markup: keyboard }
         )
         return
@@ -855,7 +855,7 @@ async function createTaskForAssignee(ctx: BotContext, draft: TaskDraftWithDeadli
     })
 
     const subtaskList = draft.subtasks.map((s: string) => `- ${s}`).join('\n') || '—'
-    const message = `Task created!\n\n*${task.title}*\nDeadline: ${formatDeadlineForDisplay(draft.deadline)}\n\nSubtasks:\n${subtaskList}`
+    const message = `Задача создана!\n\n*${task.title}*\nДедлайн: ${formatDeadlineForDisplay(draft.deadline)}\n\nПодзадачи:\n${subtaskList}`
 
     await ctx.reply(message, { parse_mode: 'Markdown' })
 }
@@ -886,7 +886,7 @@ bot.use(async (ctx, next) => {
         })
     } else {
         if (!whitelist.has(userId)) {
-            await ctx.reply('Access denied. You are not on the whitelist.')
+            await ctx.reply('Доступ запрещен. Вас нет в белом списке.')
             return
         }
 
@@ -901,7 +901,7 @@ bot.use(async (ctx, next) => {
     await next()
 })
 
-bot.command('start', (ctx) => ctx.reply('Welcome! Send me a task description.', { reply_markup: mainKeyboard }))
+bot.command('start', (ctx) => ctx.reply('Добро пожаловать! Отправьте мне описание задачи.', { reply_markup: mainKeyboard }))
 
 bot.hears('Мои задачи', async (ctx) => {
     if (!ctx.from) return
@@ -965,7 +965,7 @@ bot.on('message:text', async (ctx) => {
         return
     }
 
-    await ctx.reply('Analyzing task...')
+    await ctx.reply('Анализирую задачу...')
 
     try {
         const { title, subtasks, deadline: aiDeadline } = await parseTask(text)
@@ -988,7 +988,7 @@ bot.on('message:text', async (ctx) => {
         await handleDraftWithDeadline(ctx, { ...draft, deadline: detectedDeadline })
     } catch (error) {
         console.error(error)
-        await ctx.reply('Failed to create task. Please try again.')
+        await ctx.reply('Не удалось создать задачу. Попробуйте ещё раз.')
     }
 })
 
@@ -1114,14 +1114,14 @@ bot.on('callback_query:data', async (ctx) => {
     const pending = pendingManagerTasks.get(managerId)
 
     if (!pending) {
-        await ctx.answerCallbackQuery({ text: 'No pending task to assign.', show_alert: true })
+        await ctx.answerCallbackQuery({ text: 'Нет ожидающих задач для назначения.', show_alert: true })
         return
     }
 
     if (data === 'assign:cancel') {
         pendingManagerTasks.delete(managerId)
-        await ctx.editMessageText('Task creation cancelled.')
-        await ctx.answerCallbackQuery({ text: 'Cancelled' })
+        await ctx.editMessageText('Создание задачи отменено.')
+        await ctx.answerCallbackQuery({ text: 'Отменено' })
         return
     }
 
@@ -1133,7 +1133,7 @@ bot.on('callback_query:data', async (ctx) => {
         const [, rawId] = data.split(':')
         const parsedId = parseAssigneeId(rawId)
         if (!parsedId) {
-            await ctx.answerCallbackQuery({ text: 'Invalid assignee.', show_alert: true })
+            await ctx.answerCallbackQuery({ text: 'Неверный исполнитель.', show_alert: true })
             return
         }
         assigneeId = parsedId
@@ -1142,7 +1142,7 @@ bot.on('callback_query:data', async (ctx) => {
     const assignee = await prisma.user.findUnique({ where: { id: assigneeId } })
 
     if (!assignee) {
-        await ctx.answerCallbackQuery({ text: 'Selected assignee not found.', show_alert: true })
+        await ctx.answerCallbackQuery({ text: 'Выбранный исполнитель не найден.', show_alert: true })
         return
     }
 
@@ -1162,20 +1162,20 @@ bot.on('callback_query:data', async (ctx) => {
         pendingManagerTasks.delete(managerId)
 
         await ctx.editMessageText(
-            `Task "${task.title}" assigned to ${assignee.name || assignee.id.toString()} (deadline ${formatDeadlineForDisplay(pending.deadline)}).`
+            `Задача "${task.title}" назначена ${assignee.name || assignee.id.toString()} (дедлайн ${formatDeadlineForDisplay(pending.deadline)}).`
         )
 
-        await ctx.answerCallbackQuery({ text: 'Task assigned' })
+        await ctx.answerCallbackQuery({ text: 'Задача назначена' })
 
         if (assignee.id !== BigInt(managerId)) {
             await bot.api.sendMessage(
                 Number(assignee.id),
-                `New task assigned by ${ctx.from.first_name || 'Manager'}:\n${task.title}\nDeadline: ${formatDeadlineForDisplay(pending.deadline)}`
+                `Новая задача от ${ctx.from.first_name || 'Менеджера'}:\n${task.title}\nДедлайн: ${formatDeadlineForDisplay(pending.deadline)}`
             )
         }
     } catch (error) {
         console.error('Failed to assign task:', error)
-        await ctx.answerCallbackQuery({ text: 'Failed to create task.', show_alert: true })
+        await ctx.answerCallbackQuery({ text: 'Не удалось создать задачу.', show_alert: true })
     }
 })
 
