@@ -1,36 +1,49 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Overview
+
+CorpCore AI combines Telegram bot flows with a Telegram WebApp (Next.js) UI. The bot accepts natural-language task descriptions, generates titling/subtasks via NVIDIA Minimax, stores tasks in Postgres (Prisma), and the WebApp renders them with role-specific access. A background reminder job notifies assignees/managers about upcoming or overdue deadlines.
 
 ## Getting Started
 
-First, run the development server:
+Install dependencies and spin up the dev server:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The app is designed to run inside a Telegram WebApp context, but the UI can be previewed at [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Environment variables required (see `.env.example` if available):
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `DATABASE_URL`
+- `BOT_TOKEN`
+- `NVIDIA_API_KEY`
+- `WHITELIST`, `MANAGER_IDS`
 
-## Learn More
+## Reminder Scheduler (hourly)
 
-To learn more about Next.js, take a look at the following resources:
+Automated notifications are handled by `scripts/reminders.ts`. The script scans tasks hourly and sends daily nudges, "−1 day" warnings, day‑of‑deadline reminders, and overdue alerts (including manager escalation).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Run it manually:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+pnpm reminders
+```
 
-## Deploy on Vercel
+### Cron / background job
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Configure an hourly cron (UTC) on your host or container orchestrator:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+0 * * * * cd /app && pnpm reminders >> /var/log/corpcore-reminders.log 2>&1
+```
+
+Ensure the job runs in an environment where `BOT_TOKEN` and `DATABASE_URL` are available; otherwise Prisma or Telegram calls will fail.
+
+## Deployment notes
+
+- Next.js app: deploy as usual (Vercel, Docker, etc.).
+- Telegram bot: start via `pnpm tsx scripts/bot.ts` or your preferred process manager.
+- Reminder job: keep the hourly job active alongside the bot to guarantee deadline control.
+
+Refer to Next.js documentation for advanced optimizations, ISR/SSR configuration, etc.

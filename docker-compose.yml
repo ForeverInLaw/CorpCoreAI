@@ -28,6 +28,30 @@ services:
     depends_on:
       - db
 
+  reminders:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    command:
+      - "/bin/sh"
+      - "-c"
+      - >-
+        while true; do
+          now=$(date -u +%s);
+          target=$(( (now / 86400) * 86400 + 5 * 3600 ));
+          if [ $now -ge $target ]; then target=$((target + 86400)); fi;
+          sleep_seconds=$((target - now));
+          sleep $sleep_seconds;
+          pnpm reminders;
+        done
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/corpcoreai?schema=public
+    depends_on:
+      - db
+
   db:
     image: postgres:15-alpine
     restart: always

@@ -51,7 +51,7 @@ const pendingDeadlineRequests = new Map<number, TaskDraftBase>()
 
 const DEADLINE_PROMPT_MESSAGE = 'Дедлайн не найден. Пожалуйста, отправьте дату в формате YYYY-MM-DD или DD.MM.YYYY (. / допускается).'
 const DEADLINE_INVALID_MESSAGE = 'Не удалось распознать дату или она уже прошла. Укажите дедлайн в формате YYYY-MM-DD или DD.MM.YYYY.'
-
+// TODO: check if used
 const MONTH_NAME_MAP: Record<string, number> = {
     января: 1,
     январь: 1,

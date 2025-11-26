@@ -38,7 +38,14 @@ model Task {
   status      TaskStatus @default(IN_PROGRESS)
   deadline    DateTime?
   subtasks    Json? // Array of strings or objects
-  
+  statusChangedAt          DateTime @default(now())
+  completedAt              DateTime?
+  lastDailyReminderAt      DateTime?
+  lastDeadlineReminderAt   DateTime?
+  deadlineDayNotifiedAt    DateTime?
+  overdueNotifiedAt        DateTime?
+  managerOverdueNotifiedAt DateTime?
+
   creatorId   BigInt
   creator     User     @relation("CreatedTasks", fields: [creatorId], references: [id])
   
