@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,7 @@ interface Task {
   assigneeName?: string | null
   creatorId: string
   creatorName?: string | null
+  attachments?: Attachment[]
 }
 
 interface UserPayload {
@@ -31,6 +32,16 @@ interface UserPayload {
 interface EmployeeOption {
   id: string
   name: string
+}
+
+interface Attachment {
+  id: string
+  url: string
+  type: string
+  fileName?: string | null
+  mimeType?: string | null
+  sizeBytes?: number | null
+  createdAt: string
 }
 
 interface TasksResponse {
@@ -57,6 +68,12 @@ export default function Home() {
   const [selectedAssignee, setSelectedAssignee] = useState<string>('all')
   const [accessDenied, setAccessDenied] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
+  const [uploadingTaskId, setUploadingTaskId] = useState<string | null>(null)
+  const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({})
+  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null)
+  const [downloadErrors, setDownloadErrors] = useState<Record<string, string>>({})
+  const telegramInitDataRef = useRef<string | null>(null)
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   useEffect(() => {
     // Strict production check: Must be inside Telegram WebApp
@@ -78,6 +95,7 @@ export default function Home() {
 
   const fetchTasks = async (initData: string) => {
     setFetchError(null)
+    telegramInitDataRef.current = initData
     try {
       const res = await fetch(`/api/tasks`, {
         headers: {
@@ -115,6 +133,97 @@ export default function Home() {
   }, [tasks, activeTab, selectedAssignee])
 
   const isManager = currentUser?.role === 'MANAGER'
+
+  const canUploadToTask = (task: Task) => {
+    if (!currentUser) return false
+    if (currentUser.role === 'MANAGER') return true
+    if (task.creatorId === currentUser.id) return true
+    if (task.assigneeId && task.assigneeId === currentUser.id) return true
+    return false
+  }
+
+  const formatFileSize = (bytes?: number | null) => {
+    if (!bytes || Number.isNaN(bytes)) return '—'
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+  }
+
+  const handleFileUpload = async (taskId: string, file: File) => {
+    if (!telegramInitDataRef.current) return
+    setUploadingTaskId(taskId)
+    setUploadErrors((prev) => ({ ...prev, [taskId]: '' }))
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch(`/api/tasks/${taskId}/attachments`, {
+        method: 'POST',
+        headers: {
+          Authorization: telegramInitDataRef.current,
+        },
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}))
+        throw new Error(payload.error || 'Upload failed')
+      }
+
+      if (telegramInitDataRef.current) {
+        await fetchTasks(telegramInitDataRef.current)
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to upload file'
+      setUploadErrors((prev) => ({ ...prev, [taskId]: message }))
+    } finally {
+      setUploadingTaskId(null)
+    }
+  }
+
+  const handleFileChange = async (taskId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    await handleFileUpload(taskId, file)
+    event.target.value = ''
+  }
+
+  const requestDownloadUrl = async (attachmentId: string) => {
+    if (!telegramInitDataRef.current) {
+      throw new Error('Authorization missing')
+    }
+
+    const response = await fetch(`/api/attachments/${attachmentId}/token`, {
+      method: 'POST',
+      headers: {
+        Authorization: telegramInitDataRef.current,
+      },
+    })
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}))
+      throw new Error(payload.error || 'Failed to generate download link')
+    }
+
+    const data: { url?: string; token: string; expiresAt: string } = await response.json()
+    return data.url ?? `/api/attachments/download/${data.token}`
+  }
+
+  const handleAttachmentDownload = async (attachment: Attachment) => {
+    try {
+      setDownloadingAttachmentId(attachment.id)
+      setDownloadErrors((prev) => ({ ...prev, [attachment.id]: '' }))
+      const downloadUrl = await requestDownloadUrl(attachment.id)
+      window.open(downloadUrl, '_blank', 'noopener,noreferrer')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to prepare download'
+      setDownloadErrors((prev) => ({ ...prev, [attachment.id]: message }))
+    } finally {
+      setDownloadingAttachmentId(null)
+    }
+  }
 
   if (loading) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>
@@ -251,6 +360,58 @@ export default function Home() {
                       <p>Creator: {task.creatorName ?? 'Unknown'}</p>
                       <p>Assignee: {task.assigneeName ?? 'Not assigned'}</p>
                     </div>
+                    {task.attachments && task.attachments.length > 0 && (
+                      <div className="mb-4 text-sm">
+                        <p className="font-semibold mb-2">Attachments:</p>
+                        <ul className="space-y-2">
+                          {task.attachments.map((attachment) => (
+                            <li key={attachment.id} className="flex flex-col">
+                              <button
+                                type="button"
+                                className="text-left text-primary hover:underline"
+                                onClick={() => handleAttachmentDownload(attachment)}
+                                disabled={downloadingAttachmentId === attachment.id}
+                              >
+                                {downloadingAttachmentId === attachment.id
+                                  ? 'Preparing link...'
+                                  : attachment.fileName ?? attachment.type}
+                              </button>
+                              <span className="text-xs text-muted-foreground">
+                                {attachment.mimeType ?? 'Unknown type'} · {formatFileSize(attachment.sizeBytes)} ·
+                                {' '}
+                                {new Date(attachment.createdAt).toLocaleString()}
+                              </span>
+                              {downloadErrors[attachment.id] && (
+                                <span className="text-xs text-destructive">{downloadErrors[attachment.id]}</span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {canUploadToTask(task) && (
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="secondary"
+                            type="button"
+                            onClick={() => fileInputRefs.current[task.id]?.click()}
+                            disabled={uploadingTaskId === task.id}
+                          >
+                            {uploadingTaskId === task.id ? 'Uploading...' : 'Attach file'}
+                          </Button>
+                          <input
+                            type="file"
+                            ref={(ref) => { fileInputRefs.current[task.id] = ref }}
+                            className="hidden"
+                            onChange={(event) => handleFileChange(task.id, event)}
+                          />
+                        </div>
+                        {uploadErrors[task.id] && (
+                          <p className="text-sm text-destructive">{uploadErrors[task.id]}</p>
+                        )}
+                      </div>
+                    )}
                     {task.subtasks && Array.isArray(task.subtasks) && task.subtasks.length > 0 && (
                       <div className="bg-muted p-3 rounded-md text-sm">
                         <p className="font-semibold mb-2">Subtasks:</p>

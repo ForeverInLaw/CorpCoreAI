@@ -71,6 +71,7 @@ export async function GET(request: Request) {
             include: {
                 assignee: true,
                 creator: true,
+                attachments: true,
             },
             orderBy: { createdAt: 'desc' }
         })
@@ -85,6 +86,15 @@ export async function GET(request: Request) {
             createdAt: task.createdAt.toISOString(),
             updatedAt: task.updatedAt.toISOString(),
             deadline: task.deadline ? task.deadline.toISOString() : null,
+            attachments: task.attachments.map((attachment) => ({
+                id: attachment.id.toString(),
+                url: attachment.url,
+                type: attachment.type,
+                fileName: attachment.fileName,
+                mimeType: attachment.mimeType,
+                sizeBytes: attachment.sizeBytes,
+                createdAt: attachment.createdAt.toISOString(),
+            })),
         }))
 
         const employees = isManager

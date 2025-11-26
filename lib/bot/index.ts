@@ -1,8 +1,10 @@
-import { Bot, Context, InlineKeyboard } from 'grammy'
-import type { User } from '@prisma/client'
+import { Bot, Context, InlineKeyboard, Keyboard } from 'grammy'
+import type { TaskStatus, User } from '@prisma/client'
+import type { Document, PhotoSize } from 'grammy/types'
 import { prisma } from '../db'
 import { parseTask } from '../ai'
 import { ensureTelegramUser } from '../users'
+import { saveTelegramAttachment } from '../attachments'
 
 if (!process.env.BOT_TOKEN) {
     throw new Error('BOT_TOKEN is not defined')
@@ -48,9 +50,41 @@ type TaskDraftWithDeadline = TaskDraftBase & {
 
 const pendingManagerTasks = new Map<number, TaskDraftWithDeadline>()
 const pendingDeadlineRequests = new Map<number, TaskDraftBase>()
+const pendingAttachmentUploads = new Map<number, { taskId: number }>()
+
+const mainKeyboard = new Keyboard().text('Мои задачи').resized()
+const TASKS_PAGE_SIZE = 10
+const ATTACHABLE_STATUSES: TaskStatus[] = ['IN_PROGRESS', 'PAUSED', 'OVERDUE']
+
+type AttachmentTaskAccess = {
+    id: number
+    creatorId: bigint
+    assigneeId: bigint | null
+}
+
+type AttachmentTaskSummary = AttachmentTaskAccess & {
+    title: string
+    status: TaskStatus
+}
+
+type TaskListResult = {
+    tasks: AttachmentTaskSummary[]
+    hasNext: boolean
+}
+
+type TelegramFileDescriptor = {
+    fileId: string
+    uniqueFileId?: string | null
+    fileName?: string | null
+    mimeType?: string | null
+    size?: number | null
+}
 
 const DEADLINE_PROMPT_MESSAGE = 'Дедлайн не найден. Пожалуйста, отправьте дату в формате YYYY-MM-DD или DD.MM.YYYY (. / допускается).'
 const DEADLINE_INVALID_MESSAGE = 'Не удалось распознать дату или она уже прошла. Укажите дедлайн в формате YYYY-MM-DD или DD.MM.YYYY.'
+const ATTACHMENT_INSTRUCTIONS = 'Пришлите документ или изображение — я привяжу его к задаче.'
+const TASK_SELECTION_PROMPT = 'Выберите задачу, к которой нужно прикрепить файл:'
+const TASK_EMPTY_MESSAGE = 'У вас пока нет задач, к которым можно прикрепить файл.'
 // TODO: check if used
 const MONTH_NAME_MAP: Record<string, number> = {
     января: 1,
@@ -282,6 +316,210 @@ function addUtcDays(reference: Date, days: number): Date {
     return clone
 }
 
+async function findTaskForAttachment(taskId: number): Promise<AttachmentTaskAccess | null> {
+    return prisma.task.findUnique({
+        where: { id: taskId },
+        select: {
+            id: true,
+            creatorId: true,
+            assigneeId: true,
+        },
+    })
+}
+
+async function fetchAttachableTasks(user: User, page = 0): Promise<TaskListResult> {
+    const skip = page * TASKS_PAGE_SIZE
+    const take = TASKS_PAGE_SIZE + 1
+
+    const raw = await prisma.task.findMany({
+        where:
+            user.role === 'MANAGER'
+                ? {
+                    status: { in: ATTACHABLE_STATUSES },
+                }
+                : {
+                    status: { in: ATTACHABLE_STATUSES },
+                    OR: [{ assigneeId: user.id }, { creatorId: user.id }],
+                },
+        select: {
+            id: true,
+            creatorId: true,
+            assigneeId: true,
+            title: true,
+            status: true,
+        },
+        orderBy: { updatedAt: 'desc' },
+        skip,
+        take,
+    })
+
+    const hasNext = raw.length > TASKS_PAGE_SIZE
+    const tasks = raw.slice(0, TASKS_PAGE_SIZE)
+
+    return { tasks, hasNext }
+}
+
+function buildAttachmentKeyboard(tasks: AttachmentTaskSummary[], options: { page: number; hasPrev: boolean; hasNext: boolean }): InlineKeyboard {
+    const keyboard = new InlineKeyboard()
+    tasks.forEach((task) => {
+        const label = `#${task.id} · ${truncateTitle(task.title)} (${formatStatus(task.status)})`
+        keyboard.text(label, `attach-task:${task.id}`).row()
+    })
+
+    if (options.hasPrev || options.hasNext) {
+        if (options.hasPrev) {
+            keyboard.text('← Назад', `attach-page:${options.page - 1}`)
+        }
+        if (options.hasNext) {
+            keyboard.text('Вперёд →', `attach-page:${options.page + 1}`)
+        }
+        keyboard.row()
+    }
+
+    keyboard.text('Отмена', 'attach-cancel')
+    return keyboard
+}
+
+function truncateTitle(title: string, max = 32): string {
+    return title.length > max ? `${title.slice(0, max - 1)}…` : title
+}
+
+function formatStatus(status: TaskStatus): string {
+    const mapping: Record<TaskStatus, string> = {
+        IN_PROGRESS: 'в работе',
+        PAUSED: 'на паузе',
+        OVERDUE: 'просрочена',
+        DONE: 'готово',
+        CLOSED: 'закрыта',
+    }
+    return mapping[status] ?? status
+}
+
+function buildTaskListMessage(tasks: AttachmentTaskSummary[], page: number): string {
+    const header = `Актуальные задачи (страница ${page + 1}):`
+    const lines = tasks.map((task) => `#${task.id} · ${task.title} (${formatStatus(task.status)})`)
+    return `${header}\n${lines.join('\n')}\n\nЧтобы прикрепить файл, выберите задачу ниже:`
+}
+
+async function sendAttachmentTaskList(ctx: BotContext, page = 0, options: { edit?: boolean } = {}) {
+    const { edit = false } = options
+    const result = await fetchAttachableTasks(ctx.user, page)
+
+    if (result.tasks.length === 0) {
+        if (page > 0) {
+            await sendAttachmentTaskList(ctx, page - 1, options)
+            return
+        }
+
+        if (edit && ctx.callbackQuery?.message) {
+            await ctx.editMessageText(TASK_EMPTY_MESSAGE)
+        } else {
+            await ctx.reply(TASK_EMPTY_MESSAGE, { reply_markup: mainKeyboard })
+        }
+        return
+    }
+
+    const text = buildTaskListMessage(result.tasks, page)
+    const keyboard = buildAttachmentKeyboard(result.tasks, {
+        page,
+        hasPrev: page > 0,
+        hasNext: result.hasNext,
+    })
+
+    if (edit && ctx.callbackQuery?.message) {
+        await ctx.editMessageText(text, { reply_markup: keyboard })
+    } else {
+        await ctx.reply(text, { reply_markup: keyboard })
+    }
+}
+
+function canUploadAttachment(task: AttachmentTaskAccess, user: User): boolean {
+    if (user.role === 'MANAGER') {
+        return true
+    }
+
+    if (task.creatorId === user.id) {
+        return true
+    }
+
+    if (task.assigneeId && task.assigneeId === user.id) {
+        return true
+    }
+
+    return false
+}
+
+function descriptorFromDocument(document?: Document): TelegramFileDescriptor | null {
+    if (!document) return null
+
+    return {
+        fileId: document.file_id,
+        uniqueFileId: document.file_unique_id,
+        fileName: document.file_name ?? undefined,
+        mimeType: document.mime_type ?? undefined,
+        size: document.file_size ?? undefined,
+    }
+}
+
+function descriptorFromPhoto(photoSizes?: PhotoSize[]): TelegramFileDescriptor | null {
+    if (!photoSizes?.length) return null
+
+    const largest = photoSizes.at(-1)
+    if (!largest) return null
+    return {
+        fileId: largest.file_id,
+        uniqueFileId: largest.file_unique_id,
+        mimeType: 'image/jpeg',
+        size: largest.file_size ?? undefined,
+    }
+}
+
+async function handleIncomingAttachment(ctx: BotContext, descriptor: TelegramFileDescriptor | null) {
+    if (!ctx.from) return
+
+    const pending = pendingAttachmentUploads.get(ctx.from.id)
+    if (!pending) {
+        await ctx.reply('Чтобы прикрепить файл, сначала используйте команду /attach <ID задачи>.')
+        return
+    }
+
+    if (!descriptor) {
+        await ctx.reply('Не удалось прочитать файл. Попробуйте отправить его еще раз.')
+        return
+    }
+
+    const task = await findTaskForAttachment(pending.taskId)
+    if (!task) {
+        pendingAttachmentUploads.delete(ctx.from.id)
+        await ctx.reply('Задача не найдена. Попробуйте заново.')
+        return
+    }
+
+    if (!canUploadAttachment(task, ctx.user)) {
+        pendingAttachmentUploads.delete(ctx.from.id)
+        await ctx.reply('У вас нет прав прикреплять файлы к этой задаче.')
+        return
+    }
+
+    try {
+        await saveTelegramAttachment({
+            taskId: pending.taskId,
+            uploadedById: BigInt(ctx.from.id),
+            telegramFileId: descriptor.fileId,
+            telegramUniqueFileId: descriptor.uniqueFileId,
+            fileName: descriptor.fileName,
+            mimeType: descriptor.mimeType,
+            sizeBytes: descriptor.size ?? undefined,
+        })
+
+        pendingAttachmentUploads.delete(ctx.from.id)
+        await ctx.reply('Файл сохранен и привязан к задаче.')
+    } catch (error) {
+        console.error('Failed to save attachment', error)
+        await ctx.reply('Не удалось сохранить файл. Попробуйте позже.')
+    }
+}
+
 async function handleDraftWithDeadline(ctx: BotContext, draft: TaskDraftWithDeadline) {
     if (!ctx.from) {
         return
@@ -391,7 +629,13 @@ bot.use(async (ctx, next) => {
     await next()
 })
 
-bot.command('start', (ctx) => ctx.reply('Welcome! Send me a task description.'))
+bot.command('start', (ctx) => ctx.reply('Welcome! Send me a task description.', { reply_markup: mainKeyboard }))
+
+bot.hears('Мои задачи', async (ctx) => {
+    if (!ctx.from) return
+
+    await sendAttachmentTaskList(ctx)
+})
 
 bot.on('message:text', async (ctx) => {
     if (!ctx.from) return
@@ -446,13 +690,59 @@ bot.on('message:text', async (ctx) => {
 
 bot.on('callback_query:data', async (ctx) => {
     const data = ctx.callbackQuery.data
-    if (!data?.startsWith('assign:')) {
+
+    if (!data || !ctx.from) {
         await ctx.answerCallbackQuery()
         return
     }
 
-    if (!ctx.from) {
-        await ctx.answerCallbackQuery({ text: 'Unexpected error.', show_alert: true })
+    if (data === 'attach-cancel') {
+        pendingAttachmentUploads.delete(ctx.from.id)
+        await ctx.editMessageText('Прикрепление отменено.')
+        await ctx.answerCallbackQuery({ text: 'Отменено' })
+        return
+    }
+
+    if (data.startsWith('attach-page:')) {
+        const [, rawPage] = data.split(':')
+        const page = Number(rawPage)
+        if (!Number.isInteger(page) || page < 0) {
+            await ctx.answerCallbackQuery({ text: 'Некорректная страница', show_alert: true })
+            return
+        }
+
+        await sendAttachmentTaskList(ctx, page, { edit: true })
+        await ctx.answerCallbackQuery()
+        return
+    }
+
+    if (data.startsWith('attach-task:')) {
+        const [, rawTaskId] = data.split(':')
+        const taskId = Number(rawTaskId)
+        if (!Number.isInteger(taskId)) {
+            await ctx.answerCallbackQuery({ text: 'Неверный ID задачи', show_alert: true })
+            return
+        }
+
+        const task = await findTaskForAttachment(taskId)
+        if (!task) {
+            await ctx.answerCallbackQuery({ text: 'Задача не найдена', show_alert: true })
+            return
+        }
+
+        if (!canUploadAttachment(task, ctx.user)) {
+            await ctx.answerCallbackQuery({ text: 'Нет прав на эту задачу', show_alert: true })
+            return
+        }
+
+        pendingAttachmentUploads.set(ctx.from.id, { taskId })
+        await ctx.answerCallbackQuery({ text: `Задача #${taskId} выбрана` })
+        await ctx.reply(ATTACHMENT_INSTRUCTIONS)
+        return
+    }
+
+    if (!data.startsWith('assign:')) {
+        await ctx.answerCallbackQuery()
         return
     }
 
@@ -523,6 +813,14 @@ bot.on('callback_query:data', async (ctx) => {
         console.error('Failed to assign task:', error)
         await ctx.answerCallbackQuery({ text: 'Failed to create task.', show_alert: true })
     }
+})
+
+bot.on('message:document', async (ctx) => {
+    await handleIncomingAttachment(ctx, descriptorFromDocument(ctx.message.document))
+})
+
+bot.on('message:photo', async (ctx) => {
+    await handleIncomingAttachment(ctx, descriptorFromPhoto(ctx.message.photo))
 })
 
 bot.catch((err) => {

@@ -20,6 +20,11 @@ enum TaskStatus {
   CLOSED
 }
 
+enum AttachmentSource {
+  TELEGRAM
+  EXTERNAL
+}
+
 model User {
   id        BigInt   @id // Telegram ID
   role      Role     @default(EMPLOYEE)
@@ -29,6 +34,7 @@ model User {
 
   createdTasks  Task[] @relation("CreatedTasks")
   assignedTasks Task[] @relation("AssignedTasks")
+  uploadedFiles Attachment[]
 }
 
 model Task {
@@ -65,4 +71,26 @@ model Attachment {
   taskId    Int
   task      Task     @relation(fields: [taskId], references: [id])
   createdAt DateTime @default(now())
+
+  source               AttachmentSource @default(TELEGRAM)
+  telegramFileId       String?
+  telegramUniqueFileId String?
+  fileName             String?
+  mimeType             String?
+  sizeBytes            Int?
+  storagePath          String?
+  uploadedById         BigInt?
+  uploadedBy           User?            @relation(fields: [uploadedById], references: [id])
+  downloadTokens       DownloadToken[]
+}
+
+model DownloadToken {
+  token        String     @id @default(uuid())
+  attachmentId Int
+  attachment   Attachment @relation(fields: [attachmentId], references: [id])
+  expiresAt    DateTime
+  createdAt    DateTime   @default(now())
+
+  @@index([attachmentId])
+  @@index([expiresAt])
 }

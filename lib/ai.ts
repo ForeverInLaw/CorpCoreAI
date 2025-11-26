@@ -62,7 +62,7 @@ export async function parseTask(text: string, referenceDate: Date = new Date()):
                     },
                     { role: "user", content: text }
                 ],
-                temperature: 0.7,
+                temperature: 1,
                 max_tokens: 8192,
                 response_format: { type: "json_object" }
             })
