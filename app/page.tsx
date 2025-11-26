@@ -58,6 +58,11 @@ const STATUS_LABELS: Record<TaskStatus, string> = {
   CLOSED: 'Closed',
 }
 
+const STATUS_OPTIONS = Object.entries(STATUS_LABELS).map(([value, label]) => ({
+  value: value as TaskStatus,
+  label,
+}))
+
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
@@ -72,6 +77,9 @@ export default function Home() {
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({})
   const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null)
   const [downloadErrors, setDownloadErrors] = useState<Record<string, string>>({})
+  const [deadlineDrafts, setDeadlineDrafts] = useState<Record<string, string>>({})
+  const [updatingTasks, setUpdatingTasks] = useState<Record<string, boolean>>({})
+  const [updateErrors, setUpdateErrors] = useState<Record<string, string>>({})
   const telegramInitDataRef = useRef<string | null>(null)
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
@@ -113,6 +121,13 @@ export default function Home() {
         setTasks(data.tasks)
         setCurrentUser(data.user)
         setEmployees(data.employees ?? [])
+        setDeadlineDrafts((prev) => {
+          const next = { ...prev }
+          data.tasks.forEach((task) => {
+            next[task.id] = task.deadline ? task.deadline.slice(0, 10) : ''
+          })
+          return next
+        })
       } else {
         setFetchError('Failed to fetch tasks')
       }
@@ -148,6 +163,70 @@ export default function Home() {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
     if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
     return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+  }
+
+  const formatDateUtc = (iso?: string | null) => {
+    if (!iso) return '—'
+    return new Date(iso).toLocaleDateString('ru-RU', { timeZone: 'UTC' })
+  }
+
+  const handleTaskUpdate = async (taskId: string, payload: { status?: TaskStatus; deadline?: string | null; assigneeId?: string | null }) => {
+    if (!telegramInitDataRef.current) return
+    setUpdatingTasks((prev) => ({ ...prev, [taskId]: true }))
+    setUpdateErrors((prev) => ({ ...prev, [taskId]: '' }))
+
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: telegramInitDataRef.current,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}))
+        throw new Error(payload.error || 'Failed to update task')
+      }
+
+      if (telegramInitDataRef.current) {
+        await fetchTasks(telegramInitDataRef.current)
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update task'
+      setUpdateErrors((prev) => ({ ...prev, [taskId]: message }))
+    } finally {
+      setUpdatingTasks((prev) => ({ ...prev, [taskId]: false }))
+    }
+  }
+
+  const handleStatusChange = async (taskId: string, nextStatus: TaskStatus) => {
+    await handleTaskUpdate(taskId, { status: nextStatus })
+  }
+
+  const handleDeadlineInput = (taskId: string, value: string) => {
+    setDeadlineDrafts((prev) => ({ ...prev, [taskId]: value }))
+  }
+
+  const handleDeadlineSave = async (taskId: string) => {
+    const raw = (deadlineDrafts[taskId] ?? '').trim()
+    if (!raw) {
+      await handleTaskUpdate(taskId, { deadline: null })
+      return
+    }
+
+    const isoDate = `${raw}T00:00:00.000Z`
+    await handleTaskUpdate(taskId, { deadline: isoDate })
+  }
+
+  const handleAssigneeChange = async (taskId: string, assigneeId: string) => {
+    await handleTaskUpdate(taskId, { assigneeId: assigneeId || null })
+  }
+
+  const handleDeadlineClear = async (taskId: string) => {
+    setDeadlineDrafts((prev) => ({ ...prev, [taskId]: '' }))
+    await handleTaskUpdate(taskId, { deadline: null })
   }
 
   const handleFileUpload = async (taskId: string, file: File) => {
@@ -346,7 +425,7 @@ export default function Home() {
                       <span>Created: {new Date(task.createdAt).toLocaleDateString()}</span>
                       {task.deadline && (
                         <span className="flex items-center gap-2">
-                          Deadline: {new Date(task.deadline).toLocaleDateString()}
+                          Deadline: {formatDateUtc(task.deadline)}
                           {new Date(task.deadline) < new Date() && task.status !== 'DONE' && (
                             <Badge variant="destructive" className="text-xs">Overdue</Badge>
                           )}
@@ -389,29 +468,119 @@ export default function Home() {
                         </ul>
                       </div>
                     )}
-                    {canUploadToTask(task) && (
+                    <div className="space-y-4">
                       <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="secondary"
-                            type="button"
-                            onClick={() => fileInputRefs.current[task.id]?.click()}
-                            disabled={uploadingTaskId === task.id}
-                          >
-                            {uploadingTaskId === task.id ? 'Uploading...' : 'Attach file'}
-                          </Button>
+                        <label className="text-sm font-medium" htmlFor={`status-${task.id}`}>
+                          Status
+                        </label>
+                        <select
+                          id={`status-${task.id}`}
+                          className="border rounded-md px-3 py-2 bg-background"
+                          value={task.status}
+                          onChange={(event) => handleStatusChange(task.id, event.target.value as TaskStatus)}
+                          disabled={updatingTasks[task.id]}
+                        >
+                          {STATUS_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <label className="text-sm font-medium" htmlFor={`deadline-${task.id}`}>
+                          Deadline
+                        </label>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
                           <input
-                            type="file"
-                            ref={(ref) => { fileInputRefs.current[task.id] = ref }}
-                            className="hidden"
-                            onChange={(event) => handleFileChange(task.id, event)}
+                            type="date"
+                            id={`deadline-${task.id}`}
+                            className="border rounded-md px-3 py-2 bg-background"
+                            value={deadlineDrafts[task.id] ?? (task.deadline ? task.deadline.slice(0, 10) : '')}
+                            onChange={(event) => handleDeadlineInput(task.id, event.target.value)}
+                            disabled={updatingTasks[task.id]}
                           />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={updatingTasks[task.id]}
+                            onClick={() => handleDeadlineSave(task.id)}
+                          >
+                            Save deadline
+                          </Button>
+                          {isManager && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="text-destructive"
+                              disabled={updatingTasks[task.id]}
+                              onClick={() => handleDeadlineClear(task.id)}
+                            >
+                              Clear deadline
+                            </Button>
+                          )}
                         </div>
-                        {uploadErrors[task.id] && (
-                          <p className="text-sm text-destructive">{uploadErrors[task.id]}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Leave empty to remove deadline (managers only)
+                        </p>
+                        {task.status === 'OVERDUE' && (
+                          <p className="text-xs text-muted-foreground">
+                            Task is overdue — set a new deadline or update status.
+                          </p>
                         )}
                       </div>
-                    )}
+
+                      {isManager && (
+                        <div className="flex flex-col gap-2">
+                          <label className="text-sm font-medium" htmlFor={`assignee-${task.id}`}>
+                            Assignee
+                          </label>
+                          <select
+                            id={`assignee-${task.id}`}
+                            className="border rounded-md px-3 py-2 bg-background"
+                            value={task.assigneeId ?? ''}
+                            onChange={(event) => handleAssigneeChange(task.id, event.target.value)}
+                            disabled={updatingTasks[task.id]}
+                          >
+                            <option value="">Unassigned</option>
+                            {employees.map((employee) => (
+                              <option key={employee.id} value={employee.id}>
+                                {employee.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {canUploadToTask(task) && (
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="secondary"
+                              type="button"
+                              onClick={() => fileInputRefs.current[task.id]?.click()}
+                              disabled={uploadingTaskId === task.id}
+                            >
+                              {uploadingTaskId === task.id ? 'Uploading...' : 'Attach file'}
+                            </Button>
+                            <input
+                              type="file"
+                              ref={(ref) => { fileInputRefs.current[task.id] = ref }}
+                              className="hidden"
+                              onChange={(event) => handleFileChange(task.id, event)}
+                            />
+                          </div>
+                          {uploadErrors[task.id] && (
+                            <p className="text-sm text-destructive">{uploadErrors[task.id]}</p>
+                          )}
+                        </div>
+                      )}
+
+                      {updateErrors[task.id] && (
+                        <p className="text-sm text-destructive">{updateErrors[task.id]}</p>
+                      )}
+                    </div>
                     {task.subtasks && Array.isArray(task.subtasks) && task.subtasks.length > 0 && (
                       <div className="bg-muted p-3 rounded-md text-sm">
                         <p className="font-semibold mb-2">Subtasks:</p>
