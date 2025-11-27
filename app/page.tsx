@@ -8,6 +8,17 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 
 type TaskStatus = 'IN_PROGRESS' | 'DONE' | 'PAUSED' | 'OVERDUE' | 'CLOSED'
 
+type TaskHistoryType = 'STATUS_CHANGE' | 'DEADLINE_CHANGE' | 'ASSIGNEE_CHANGE' | 'OVERDUE_REASON'
+
+interface TaskHistoryEntry {
+  id: string
+  type: TaskHistoryType
+  details?: Record<string, unknown> | null
+  createdAt: string
+  actorId: string | null
+  actorName: string | null
+}
+
 interface Task {
   id: string
   title: string
@@ -22,6 +33,7 @@ interface Task {
   creatorName?: string | null
   overdueReason?: string | null
   attachments?: Attachment[]
+  history?: TaskHistoryEntry[]
 }
 
 interface UserPayload {
@@ -81,6 +93,8 @@ export default function Home() {
   const [deadlineDrafts, setDeadlineDrafts] = useState<Record<string, string>>({})
   const [updatingTasks, setUpdatingTasks] = useState<Record<string, boolean>>({})
   const [updateErrors, setUpdateErrors] = useState<Record<string, string>>({})
+  const [searchQuery, setSearchQuery] = useState('')
+  const [onlyOverdueReasons, setOnlyOverdueReasons] = useState(false)
   const telegramInitDataRef = useRef<string | null>(null)
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
@@ -141,12 +155,25 @@ export default function Home() {
   }
 
   const filteredTasks = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase()
     return tasks.filter((task) => {
       const matchStatus = task.status === activeTab
       const matchAssignee = selectedAssignee === 'all' || task.assigneeId === selectedAssignee
-      return matchStatus && matchAssignee
+      const matchSearch = normalizedQuery
+        ? [task.title, task.description, task.overdueReason]
+            .filter(Boolean)
+            .some((field) => field!.toLowerCase().includes(normalizedQuery)) ||
+          (task.history ?? []).some((entry) => {
+            const details = entry.details as Record<string, unknown> | undefined
+            const reason = typeof details?.reason === 'string' ? details.reason : ''
+            return reason.toLowerCase().includes(normalizedQuery)
+          })
+        : true
+      const hasOverdueReasonHistory = (task.history ?? []).some((entry) => entry.type === 'OVERDUE_REASON')
+      const matchOverdueReasonFilter = onlyOverdueReasons ? hasOverdueReasonHistory : true
+      return matchStatus && matchAssignee && matchSearch && matchOverdueReasonFilter
     })
-  }, [tasks, activeTab, selectedAssignee])
+  }, [tasks, activeTab, selectedAssignee, searchQuery, onlyOverdueReasons])
 
   const isManager = currentUser?.role === 'MANAGER'
 
@@ -305,6 +332,22 @@ export default function Home() {
     }
   }
 
+  const renderHistoryEntry = (entry: TaskHistoryEntry) => {
+    const details = (entry.details ?? {}) as Record<string, unknown>
+    switch (entry.type) {
+      case 'STATUS_CHANGE':
+        return `Статус: ${String(details.from ?? '—')} → ${String(details.to ?? '—')}`
+      case 'DEADLINE_CHANGE':
+        return `Дедлайн: ${details.from ? new Date(details.from as string).toLocaleDateString() : '—'} → ${details.to ? new Date(details.to as string).toLocaleDateString() : '—'}`
+      case 'ASSIGNEE_CHANGE':
+        return `Исполнитель: ${(details.fromName as string) ?? '—'} → ${(details.toName as string) ?? '—'}`
+      case 'OVERDUE_REASON':
+        return `Причина просрочки: ${(details.reason as string) ?? '—'}`
+      default:
+        return 'Обновление задачи'
+    }
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center min-h-screen">Загрузка...</div>
   }
@@ -395,6 +438,30 @@ export default function Home() {
                 </option>
               ))}
             </select>
+          </label>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <label className="flex flex-col gap-2 text-sm w-full">
+          <span className="text-muted-foreground">Поиск по задачам и причинам просрочек</span>
+          <input
+            type="text"
+            className="border rounded-md px-3 py-2 bg-background"
+            placeholder="Введите текст..."
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+          />
+        </label>
+        {isManager && (
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="accent-primary"
+              checked={onlyOverdueReasons}
+              onChange={(event) => setOnlyOverdueReasons(event.target.checked)}
+            />
+            <span>Только задачи с объяснённой просрочкой</span>
           </label>
         )}
       </div>
@@ -585,6 +652,22 @@ export default function Home() {
                         <p className="text-sm text-destructive">{updateErrors[task.id]}</p>
                       )}
                     </div>
+                    {(task.history && task.history.length > 0) && (
+                      <div className="mt-4 text-sm">
+                        <p className="font-semibold mb-2">История изменений</p>
+                        <ul className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                          {task.history.map((entry) => (
+                            <li key={entry.id} className="rounded-md border p-2">
+                              <div className="flex justify-between text-xs text-muted-foreground">
+                                <span>{new Date(entry.createdAt).toLocaleString()}</span>
+                                <span>{entry.actorName ?? (entry.actorId ? `ID ${entry.actorId}` : '—')}</span>
+                              </div>
+                              <p className="text-sm mt-1">{renderHistoryEntry(entry)}</p>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                     {task.subtasks && Array.isArray(task.subtasks) && task.subtasks.length > 0 && (
                       <div className="bg-muted p-3 rounded-md text-sm">
                         <p className="font-semibold mb-2">Подзадачи:</p>

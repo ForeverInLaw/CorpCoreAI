@@ -54,6 +54,18 @@ export async function GET(request: Request) {
                 assignee: true,
                 creator: true,
                 attachments: true,
+                history: {
+                    orderBy: { createdAt: 'desc' },
+                    take: 50,
+                    include: {
+                        actor: {
+                            select: {
+                                id: true,
+                                name: true,
+                            },
+                        },
+                    },
+                },
             },
             orderBy: { createdAt: 'desc' }
         })
@@ -80,6 +92,14 @@ export async function GET(request: Request) {
                 mimeType: attachment.mimeType,
                 sizeBytes: attachment.sizeBytes,
                 createdAt: attachment.createdAt.toISOString(),
+            })),
+            history: task.history.map((entry) => ({
+                id: entry.id.toString(),
+                type: entry.type,
+                details: entry.details,
+                createdAt: entry.createdAt.toISOString(),
+                actorId: entry.actorId ? entry.actorId.toString() : null,
+                actorName: entry.actor?.name ?? (entry.actorId ? `ID ${entry.actorId.toString()}` : null),
             })),
         }))
 

@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db'
 import { validateTelegramWebAppData } from '@/lib/auth'
 import { ensureTelegramUser, isWhitelistedTelegramId } from '@/lib/users'
 import { bot } from '@/lib/bot'
+import { logTaskHistory, type TaskHistoryDetails, type TaskHistoryType } from '@/lib/task-history'
 
 const EMPLOYEE_FORBIDDEN_STATUSES = new Set<TaskStatus>(['CLOSED'])
 const VALID_STATUS_VALUES = new Set<TaskStatus>(Object.values(TaskStatus))
@@ -126,6 +127,8 @@ export async function PATCH(
   const updates: Record<string, unknown> = {}
   let nextStatus: TaskStatus | undefined
   let notifyAssigneeId: bigint | null = null
+  const historyEntries: { type: TaskHistoryType; details?: TaskHistoryDetails }[] = []
+  const previousDeadlineIso = task.deadline ? task.deadline.toISOString() : null
 
   if (body.assigneeId !== undefined) {
     if (telegramUser.role !== 'MANAGER') {
@@ -134,6 +137,17 @@ export async function PATCH(
 
     if (body.assigneeId === null || body.assigneeId === '') {
       updates.assigneeId = null
+      if (task.assigneeId) {
+        historyEntries.push({
+          type: 'ASSIGNEE_CHANGE',
+          details: {
+            fromId: task.assigneeId.toString(),
+            fromName: task.assignee?.name ?? null,
+            toId: null,
+            toName: null,
+          },
+        })
+      }
     } else if (typeof body.assigneeId === 'string') {
       const parsedId = Number(body.assigneeId)
       if (!parsedId || Number.isNaN(parsedId)) {
@@ -148,6 +162,15 @@ export async function PATCH(
       updates.assigneeId = assignee.id
       if (!task.assigneeId || task.assigneeId !== assignee.id) {
         notifyAssigneeId = assignee.id
+        historyEntries.push({
+          type: 'ASSIGNEE_CHANGE',
+          details: {
+            fromId: task.assigneeId ? task.assigneeId.toString() : null,
+            fromName: task.assignee?.name ?? null,
+            toId: assignee.id.toString(),
+            toName: assignee.name ?? null,
+          },
+        })
       }
     } else {
       return NextResponse.json({ error: 'Assignee ID must be a string or null' }, { status: 400 })
@@ -169,6 +192,13 @@ export async function PATCH(
       updates.status = nextStatus
       updates.statusChangedAt = new Date()
       updates.completedAt = nextStatus === TaskStatus.DONE ? new Date() : null
+      historyEntries.push({
+        type: 'STATUS_CHANGE',
+        details: {
+          from: task.status,
+          to: nextStatus,
+        },
+      })
     }
   }
 
@@ -184,6 +214,15 @@ export async function PATCH(
         return NextResponse.json({ error: 'Only managers can remove deadlines' }, { status: 403 })
       }
       updates.deadline = null
+      if (previousDeadlineIso) {
+        historyEntries.push({
+          type: 'DEADLINE_CHANGE',
+          details: {
+            from: previousDeadlineIso,
+            to: null,
+          },
+        })
+      }
     } else {
       const today = normalizeStartOfDay(new Date())
       const normalizedDeadline = normalizeStartOfDay(parsedDeadline.value)
@@ -198,9 +237,27 @@ export async function PATCH(
       updates.overdueNotifiedAt = null
       updates.managerOverdueNotifiedAt = null
 
+      const newDeadlineIso = normalizedDeadline.toISOString()
+      if (previousDeadlineIso !== newDeadlineIso) {
+        historyEntries.push({
+          type: 'DEADLINE_CHANGE',
+          details: {
+            from: previousDeadlineIso,
+            to: newDeadlineIso,
+          },
+        })
+      }
+
       if (task.status === TaskStatus.OVERDUE && !nextStatus) {
         updates.status = TaskStatus.IN_PROGRESS
         updates.statusChangedAt = new Date()
+        historyEntries.push({
+          type: 'STATUS_CHANGE',
+          details: {
+            from: task.status,
+            to: TaskStatus.IN_PROGRESS,
+          },
+        })
       }
     }
   }
@@ -214,6 +271,19 @@ export async function PATCH(
     data: updates,
     include: { assignee: true, creator: true },
   })
+
+  if (historyEntries.length > 0) {
+    await Promise.all(
+      historyEntries.map((entry) =>
+        logTaskHistory({
+          taskId: updatedTask.id,
+          actorId: telegramUser.id,
+          type: entry.type,
+          details: entry.details,
+        })
+      )
+    )
+  }
 
   if (notifyAssigneeId) {
     const deadlineText = updatedTask.deadline

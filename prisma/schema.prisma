@@ -35,6 +35,7 @@ model User {
   createdTasks  Task[] @relation("CreatedTasks")
   assignedTasks Task[] @relation("AssignedTasks")
   uploadedFiles Attachment[]
+  historyEntries TaskHistory[] @relation("TaskHistoryActor")
 }
 
 model Task {
@@ -60,6 +61,7 @@ model Task {
   assignee    User?    @relation("AssignedTasks", fields: [assigneeId], references: [id])
 
   attachments Attachment[]
+  history     TaskHistory[]
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -94,4 +96,18 @@ model DownloadToken {
 
   @@index([attachmentId])
   @@index([expiresAt])
+}
+
+model TaskHistory {
+  id        Int      @id @default(autoincrement())
+  taskId    Int
+  task      Task     @relation(fields: [taskId], references: [id])
+  actorId   BigInt?
+  actor     User?    @relation("TaskHistoryActor", fields: [actorId], references: [id])
+  type      String
+  details   Json?
+  createdAt DateTime @default(now())
+
+  @@index([taskId, createdAt])
+  @@index([createdAt])
 }

@@ -5,6 +5,7 @@ import { prisma } from '../db'
 import { parseTask } from '../ai'
 import { ensureTelegramUser } from '../users'
 import { saveTelegramAttachment } from '../attachments'
+import { logTaskHistory, type TaskHistoryDetails } from '../task-history'
 
 if (!process.env.BOT_TOKEN) {
     throw new Error('BOT_TOKEN is not defined')
@@ -573,6 +574,16 @@ async function handleTaskStatusChange(ctx: BotContext, taskId: number, nextStatu
         include: { assignee: true, creator: true },
     })
 
+    await logTaskHistory({
+        taskId: updated.id,
+        actorId: ctx.user.id,
+        type: 'STATUS_CHANGE',
+        details: {
+            from: task.status,
+            to: nextStatus,
+        },
+    })
+
     await ctx.answerCallbackQuery({ text: `Статус: ${STATUS_LABELS[nextStatus]}` })
     await sendTaskDetails(ctx, updated, { edit: true })
 }
@@ -652,6 +663,54 @@ async function completeDeadlineAdjustment(
     const statusNote = statusReset ? ' Статус возвращён в «В работе».' : ''
     await ctx.reply(`Дедлайн обновлён: ${deadlineText}.${statusNote}`)
     await sendTaskDetails(ctx, updated)
+
+    const historyEntries: { type: 'DEADLINE_CHANGE' | 'STATUS_CHANGE' | 'OVERDUE_REASON'; details?: TaskHistoryDetails }[] = []
+    const previousDeadlineIso = task.deadline ? task.deadline.toISOString() : null
+    const newDeadlineIso = normalizedDeadline.toISOString()
+
+    if (previousDeadlineIso !== newDeadlineIso || entry.reason) {
+        historyEntries.push({
+            type: 'DEADLINE_CHANGE',
+            details: {
+                from: previousDeadlineIso,
+                to: newDeadlineIso,
+            },
+        })
+    }
+
+    if (statusReset) {
+        historyEntries.push({
+            type: 'STATUS_CHANGE',
+            details: {
+                from: task.status,
+                to: 'IN_PROGRESS',
+            },
+        })
+    }
+
+    if (entry.reason) {
+        historyEntries.push({
+            type: 'OVERDUE_REASON',
+            details: {
+                reason: entry.reason,
+                previousDeadline: previousDeadlineIso,
+                newDeadline: newDeadlineIso,
+            },
+        })
+    }
+
+    if (historyEntries.length > 0) {
+        await Promise.all(
+            historyEntries.map((entryDetails) =>
+                logTaskHistory({
+                    taskId: updated.id,
+                    actorId: ctx.user.id,
+                    type: entryDetails.type,
+                    details: entryDetails.details,
+                })
+            )
+        )
+    }
 
     if (entry.reason) {
         const actorName = ctx.user.name || ctx.from?.first_name || `ID ${ctx.user.id.toString()}`
