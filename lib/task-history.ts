@@ -34,3 +34,26 @@ export async function logTaskHistory({
     },
   })
 }
+
+export async function getTaskHistory(taskId: number) {
+  const history = await prisma.taskHistory.findMany({
+    where: {
+      taskId,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+    include: {
+      user: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  })
+
+  return history.map((entry) => ({
+    ...entry,
+    actorName: entry.user?.name ?? null,
+  }))
+}

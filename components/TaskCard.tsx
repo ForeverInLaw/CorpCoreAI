@@ -51,6 +51,8 @@ import type {
   Attachment
 } from '@/types/tasks'
 
+import { TaskHistoryLog } from '@/components/TaskHistoryLog'
+
 interface TaskCardProps {
   task: Task
   currentUser: UserPayload | null
@@ -457,6 +459,10 @@ export function TaskCard({
               )}
               {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
             </div>
+
+            <Separator />
+            
+            <TaskHistoryLog history={task.history || []} />
 
             {updateError && (
               <div className="bg-destructive/10 text-destructive text-xs p-2 rounded-md">
