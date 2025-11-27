@@ -653,17 +653,52 @@ async function completeDeadlineAdjustment(
     await ctx.reply(`Дедлайн обновлён: ${deadlineText}.${statusNote}`)
     await sendTaskDetails(ctx, updated)
 
-    if (entry.reason && updated.creatorId !== ctx.user.id) {
+    if (entry.reason) {
         const actorName = ctx.user.name || ctx.from?.first_name || `ID ${ctx.user.id.toString()}`
         const notification = [
             `Задача "${updated.title}" получила новый дедлайн (${deadlineText}).`,
             `Исполнитель ${actorName} пояснил причину: ${entry.reason}`,
         ].join('\n')
-        try {
-            await bot.api.sendMessage(Number(updated.creatorId), notification)
-        } catch (error) {
-            console.error('Failed to notify creator about overdue reason', error)
+
+        const recipients = new Set<bigint>()
+
+        if (updated.creatorId !== ctx.user.id) {
+            recipients.add(updated.creatorId)
         }
+
+        if (updated.creator?.role !== 'MANAGER') {
+            const excludedIds: bigint[] = [ctx.user.id]
+            if (updated.creatorId !== ctx.user.id) {
+                excludedIds.push(updated.creatorId)
+            }
+
+            const managerUsers = await prisma.user.findMany({
+                where: {
+                    role: 'MANAGER',
+                    id: {
+                        notIn: excludedIds,
+                    },
+                },
+                select: { id: true },
+            })
+
+            managerUsers.forEach((manager) => {
+                recipients.add(manager.id)
+            })
+        }
+
+        await Promise.all(
+            Array.from(recipients).map(async (recipientId) => {
+                try {
+                    await bot.api.sendMessage(Number(recipientId), notification)
+                } catch (error) {
+                    console.error('Failed to notify about overdue reason', {
+                        recipientId: recipientId.toString(),
+                        error,
+                    })
+                }
+            })
+        )
     }
 }
 
