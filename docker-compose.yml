@@ -1,56 +1,83 @@
-version: '3.8'
-
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        DATABASE_URL: ${DATABASE_URL}
     restart: always
     ports:
-      - "3000:3000"
+      - "3005:3005"
     env_file:
       - .env
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/corpcoreai?schema=public
     depends_on:
-      - db
+      migrate:
+        condition: service_completed_successfully
 
   bot:
     build:
       context: .
       dockerfile: Dockerfile
-    command: ["node", "scripts/bot.js"] # Note: You might need to compile scripts/bot.ts first or use ts-node in Docker
+      args:
+        DATABASE_URL: ${DATABASE_URL}
+    command: ["pnpm", "bot"]
     restart: always
     env_file:
       - .env
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/corpcoreai?schema=public
     depends_on:
-      - db
+      migrate:
+        condition: service_completed_successfully
 
   reminders:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        DATABASE_URL: ${DATABASE_URL}
     restart: always
     command:
       - "/bin/sh"
       - "-c"
-      - >-
+      - |-
+        pnpm reminders || echo "[reminders] Initial job failed; will try again at next schedule";
         while true; do
-          now=$(date -u +%s);
-          target=$(( (now / 86400) * 86400 + 5 * 3600 ));
-          if [ $now -ge $target ]; then target=$((target + 86400)); fi;
-          sleep_seconds=$((target - now));
-          sleep $sleep_seconds;
-          pnpm reminders;
+          now=$$(date -u +%s);
+          target=$$(( (now / 86400) * 86400 + 5 * 3600 )); # 05:00 UTC == 08:00 MSK
+          if [ $$now -ge $$target ]; then
+            target=$$((target + 86400));
+          fi;
+          sleep_seconds=$$((target - now));
+          echo "[reminders] Sleeping $$sleep_seconds seconds until next 08:00 MSK run";
+          sleep $$sleep_seconds;
+          pnpm reminders || echo "[reminders] Job failed; will retry tomorrow";
         done
     env_file:
       - .env
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/corpcoreai?schema=public
     depends_on:
-      - db
+      migrate:
+        condition: service_completed_successfully
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        DATABASE_URL: ${DATABASE_URL}
+    command: ["pnpm", "prisma", "migrate", "deploy"]
+    restart: "no"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/corpcoreai?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
 
   db:
     image: postgres:15-alpine
@@ -59,6 +86,11 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: corpcoreai
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     ports:
       - "5432:5432"
     volumes:

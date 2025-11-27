@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "bot": "tsx scripts/bot.ts",
     "reminders": "tsx scripts/reminders.ts"
   },
   "dependencies": {
@@ -32,6 +33,9 @@
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
+    "@prisma/debug": "^7.0.1",
+    "@prisma/engines": "^7.0.1",
+    "@prisma/engines-version": "7.1.0-2.f09f2815f091dbba658cdcd2264306d88bb5bda6",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
