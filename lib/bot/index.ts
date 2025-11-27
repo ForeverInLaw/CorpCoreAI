@@ -774,7 +774,7 @@ async function handleIncomingAttachment(ctx: BotContext, descriptor: TelegramFil
     }
 
     try {
-        await saveTelegramAttachment({
+        const attachment = await saveTelegramAttachment({
             taskId: pending.taskId,
             uploadedById: BigInt(ctx.from.id),
             telegramFileId: descriptor.fileId,
@@ -784,11 +784,62 @@ async function handleIncomingAttachment(ctx: BotContext, descriptor: TelegramFil
             sizeBytes: descriptor.size ?? undefined,
         })
 
+        await notifyManagerAboutAttachmentUploadFromBot({
+            taskId: pending.taskId,
+            uploader: ctx.user,
+            attachment,
+        })
+
         pendingAttachmentUploads.delete(ctx.from.id)
         await ctx.reply('Файл сохранен и привязан к задаче.')
     } catch (error) {
         console.error('Failed to save attachment', error)
         await ctx.reply('Не удалось сохранить файл. Попробуйте позже.')
+    }
+}
+
+async function notifyManagerAboutAttachmentUploadFromBot({
+    taskId,
+    uploader,
+    attachment,
+}: {
+    taskId: number
+    uploader: User
+    attachment: { fileName?: string | null; type: string | null }
+}) {
+    const task = await prisma.task.findUnique({
+        where: { id: taskId },
+        select: {
+            title: true,
+            creatorId: true,
+            creator: {
+                select: {
+                    role: true,
+                    name: true,
+                },
+            },
+        },
+    })
+
+    if (!task || task.creator?.role !== 'MANAGER') {
+        return
+    }
+
+    if (task.creatorId === uploader.id) {
+        return
+    }
+
+    const uploaderName = uploader.name ?? `ID ${uploader.id.toString()}`
+    const attachmentLabel = attachment.fileName ?? attachment.type ?? 'файл'
+    const message = [
+        `Задача "${task.title}" получила новый файл: ${attachmentLabel}.`,
+        `Загрузил: ${uploaderName}.`,
+    ].join('\n')
+
+    try {
+        await bot.api.sendMessage(Number(task.creatorId), message)
+    } catch (error) {
+        console.error('Failed to notify manager about attachment upload', error)
     }
 }
 

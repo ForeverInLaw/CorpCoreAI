@@ -7,10 +7,47 @@ import { validateTelegramWebAppData } from '@/lib/auth'
 import { ensureTelegramUser, isWhitelistedTelegramId } from '@/lib/users'
 import { saveExternalAttachment } from '@/lib/attachments'
 import { ensureStorageRoot, buildStoredFilePath, toRelativeStoragePath } from '@/lib/storage'
+import { bot } from '@/lib/bot'
 
 const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024 // 2GB (Telegram limit)
 function sanitizeFileName(name: string) {
   return name.replaceAll(/[^a-zA-Z0-9_.-]+/g, '_')
+}
+
+async function notifyManagerAboutAttachmentUploadFromWebApp({
+  task,
+  uploader,
+  attachment,
+}: {
+  task: {
+    id: number
+    title: string
+    creatorId: bigint
+    creator: { role: 'EMPLOYEE' | 'MANAGER'; name: string | null } | null
+  }
+  uploader: { id: bigint; name?: string | null }
+  attachment: { fileName?: string | null; type: string | null }
+}) {
+  if (task.creator?.role !== 'MANAGER') {
+    return
+  }
+
+  if (task.creatorId === uploader.id) {
+    return
+  }
+
+  const uploaderName = uploader.name ?? `ID ${uploader.id.toString()}`
+  const attachmentLabel = attachment.fileName ?? attachment.type ?? 'файл'
+  const message = [
+    `Задача "${task.title}" получила новый файл: ${attachmentLabel}.`,
+    `Загрузил: ${uploaderName}.`,
+  ].join('\n')
+
+  try {
+    await bot.api.sendMessage(Number(task.creatorId), message)
+  } catch (error) {
+    console.error('Failed to notify manager about attachment upload (WebApp)', error)
+  }
 }
 
 function canUploadToTask(task: { creatorId: bigint; assigneeId: bigint | null }, userId: bigint, role: 'EMPLOYEE' | 'MANAGER') {
@@ -55,7 +92,18 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
 
     const task = await prisma.task.findUnique({
       where: { id: taskId },
-      select: { id: true, creatorId: true, assigneeId: true },
+      select: {
+        id: true,
+        title: true,
+        creatorId: true,
+        assigneeId: true,
+        creator: {
+          select: {
+            role: true,
+            name: true,
+          }
+        }
+      },
     })
 
     if (!task) {
@@ -96,6 +144,8 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
       sizeBytes: typeof file.size === 'number' ? file.size : undefined,
       storagePath,
     })
+
+    await notifyManagerAboutAttachmentUploadFromWebApp({ task, uploader: telegramUser, attachment })
 
     return NextResponse.json({
       attachment: {
