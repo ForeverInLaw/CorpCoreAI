@@ -7,6 +7,10 @@ export type TaskHistoryType =
   | 'DEADLINE_CHANGE'
   | 'ASSIGNEE_CHANGE'
   | 'OVERDUE_REASON'
+  | 'TEAM_CHANGE'
+  | 'TAG_CHANGE'
+  | 'PROJECT_CHANGE'
+  | 'REVIEW_STATUS_CHANGE'
 
 export type TaskHistoryDetails = Prisma.InputJsonValue
 

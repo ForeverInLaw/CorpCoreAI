@@ -20,6 +20,13 @@ enum TaskStatus {
   CLOSED
 }
 
+enum TaskCompletionReviewStatus {
+  NOT_REQUESTED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum AttachmentSource {
   TELEGRAM
   EXTERNAL
@@ -34,8 +41,10 @@ model User {
 
   createdTasks  Task[] @relation("CreatedTasks")
   assignedTasks Task[] @relation("AssignedTasks")
+  taskAssignments TaskAssignment[]
   uploadedFiles Attachment[]
   historyEntries TaskHistory[] @relation("TaskHistoryActor")
+  completionReviews Task[] @relation("TaskCompletionReviewer")
 }
 
 model Task {
@@ -43,10 +52,14 @@ model Task {
   title       String
   description String?
   status      TaskStatus @default(IN_PROGRESS)
+  completionReviewStatus TaskCompletionReviewStatus @default(NOT_REQUESTED)
   deadline    DateTime?
   subtasks    Json? // Array of strings or objects
   statusChangedAt          DateTime @default(now())
   completedAt              DateTime?
+  completionRequestedAt    DateTime?
+  completionReviewedAt     DateTime?
+  completionReviewedById   BigInt?
   lastDailyReminderAt      DateTime?
   lastDeadlineReminderAt   DateTime?
   deadlineDayNotifiedAt    DateTime?
@@ -60,11 +73,77 @@ model Task {
   assigneeId  BigInt?
   assignee    User?    @relation("AssignedTasks", fields: [assigneeId], references: [id])
 
+  assignments TaskAssignment[]
+  tags        TaskTag[]
+  projects    TaskProject[]
+  completionReviewedBy User? @relation("TaskCompletionReviewer", fields: [completionReviewedById], references: [id])
+
   attachments Attachment[]
   history     TaskHistory[]
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model Project {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  color       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tags  Tag[]
+  tasks TaskProject[]
+}
+
+model Tag {
+  id          Int      @id @default(autoincrement())
+  label       String
+  color       String?
+  projectId   Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project Project? @relation(fields: [projectId], references: [id])
+  tasks   TaskTag[]
+
+  @@unique([label, projectId])
+}
+
+model TaskAssignment {
+  taskId    Int
+  userId    BigInt
+  isLead    Boolean  @default(false)
+  assignedAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@id([taskId, userId])
+  @@index([userId])
+}
+
+model TaskTag {
+  taskId Int
+  tagId  Int
+
+  task Task @relation(fields: [taskId], references: [id])
+  tag  Tag  @relation(fields: [tagId], references: [id])
+
+  @@id([taskId, tagId])
+  @@index([tagId])
+}
+
+model TaskProject {
+  taskId    Int
+  projectId Int
+
+  task    Task    @relation(fields: [taskId], references: [id])
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@id([taskId, projectId])
+  @@index([projectId])
 }
 
 model Attachment {

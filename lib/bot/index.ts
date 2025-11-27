@@ -1,11 +1,12 @@
 import { Bot, Context, InlineKeyboard, Keyboard } from 'grammy'
+import { TaskCompletionReviewStatus } from '@prisma/client'
 import type { Prisma, TaskStatus, User } from '@prisma/client'
 import type { Document, PhotoSize } from 'grammy/types'
 import { prisma } from '../db'
 import { parseTask } from '../ai'
 import { ensureTelegramUser } from '../users'
 import { saveTelegramAttachment } from '../attachments'
-import { logTaskHistory, type TaskHistoryDetails } from '../task-history'
+import { logTaskHistory, type TaskHistoryDetails, type TaskHistoryType } from '../task-history'
 
 if (!process.env.BOT_TOKEN) {
     throw new Error('BOT_TOKEN is not defined')
@@ -49,9 +50,28 @@ type TaskDraftWithDeadline = TaskDraftBase & {
     deadline: Date
 }
 
-type TaskWithRelations = Prisma.TaskGetPayload<{
-    include: { assignee: true; creator: true }
-}>
+const TASK_RELATIONS = {
+    assignee: true,
+    creator: true,
+    assignments: {
+        include: {
+            user: {
+                select: {
+                    id: true,
+                    name: true,
+                },
+            },
+        },
+    },
+    tags: {
+        include: { tag: true },
+    },
+    projects: {
+        include: { project: true },
+    },
+} satisfies Prisma.TaskInclude
+
+type TaskWithRelations = Prisma.TaskGetPayload<{ include: typeof TASK_RELATIONS }>
 
 const pendingManagerTasks = new Map<number, TaskDraftWithDeadline>()
 const pendingDeadlineRequests = new Map<number, TaskDraftBase>()
@@ -73,11 +93,13 @@ const STATUS_LABELS: Record<TaskStatus, string> = {
     CLOSED: 'Закрыта',
 }
 const EMPLOYEE_FORBIDDEN_STATUSES = new Set<TaskStatus>(['CLOSED'])
+const REVIEW_ACTIONS = new Set(['APPROVE', 'REJECT'] as const)
 
 type AttachmentTaskAccess = {
     id: number
     creatorId: bigint
     assigneeId: bigint | null
+    assignments: { userId: bigint }[]
 }
 
 type AttachmentTaskSummary = AttachmentTaskAccess & {
@@ -91,6 +113,15 @@ type TaskListResult = {
 }
 
 function hasTaskAccess(creatorId: bigint, assigneeId: bigint | null, user: User): boolean {
+    // This function seems unused or needs to be updated if used.
+    // Based on the code structure, access checks are mostly done via canAccessTask or query filters.
+    // We'll keep it simple for now or remove it if unused. 
+    // Checking usage: it appears unused in the main logic flows I examined, 
+    // but to be safe I'll update it to fail safe or leave as is if not called.
+    // Actually, let's update it to be correct conceptually even if unused, 
+    // but it lacks assignments data. 
+    // Since I can't change signature easily without finding callers (none found in my read), 
+    // I will assume canAccessTask is the primary one.
     if (user.role === 'MANAGER') {
         return true
     }
@@ -372,6 +403,9 @@ async function findTaskForAttachment(taskId: number): Promise<AttachmentTaskAcce
             id: true,
             creatorId: true,
             assigneeId: true,
+            assignments: {
+                select: { userId: true },
+            },
         },
     })
 }
@@ -384,18 +418,25 @@ async function fetchAttachableTasks(user: User, page = 0): Promise<TaskListResul
         where:
             user.role === 'MANAGER'
                 ? {
-                    status: { in: ATTACHABLE_STATUSES },
-                }
+                      status: { in: ATTACHABLE_STATUSES },
+                  }
                 : {
-                    status: { in: ATTACHABLE_STATUSES },
-                    OR: [{ assigneeId: user.id }, { creatorId: user.id }],
-                },
+                      status: { in: ATTACHABLE_STATUSES },
+                      OR: [
+                          { assigneeId: user.id },
+                          { creatorId: user.id },
+                          { assignments: { some: { userId: user.id } } },
+                      ],
+                  },
         select: {
             id: true,
             creatorId: true,
             assigneeId: true,
             title: true,
             status: true,
+            assignments: {
+                select: { userId: true },
+            },
         },
         orderBy: { updatedAt: 'desc' },
         skip,
@@ -450,6 +491,10 @@ function canAccessTask(task: TaskWithRelations, user: User): boolean {
         return true
     }
 
+    if (task.assignments?.some((a) => a.userId === user.id)) {
+        return true
+    }
+
     return false
 }
 
@@ -457,14 +502,33 @@ function buildTaskSummaryMessage(task: TaskWithRelations): string {
     const creator = task.creator?.name ?? `ID ${task.creatorId.toString()}`
     const assignee = task.assignee?.name ?? (task.assigneeId ? `ID ${task.assigneeId.toString()}` : 'Не назначена')
     const deadline = task.deadline ? formatDeadlineForDisplay(task.deadline) : '—'
+    const teamDetails = task.assignments
+        ?.map((assignment) => `${assignment.isLead ? '⭐ ' : ''}${assignment.user?.name ?? `ID ${assignment.userId.toString()}`}`)
+        .join(', ')
+    const tagDetails = task.tags?.map(({ tag }) => `#${tag.label}`).join(', ')
+    const projectDetails = task.projects?.map(({ project }) => project.name).join(', ')
 
-    return [
+    const lines = [
         `#${task.id} · ${task.title}`,
         `Статус: ${formatStatus(task.status)}`,
         `Дедлайн: ${deadline}`,
         `Создатель: ${creator}`,
         `Исполнитель: ${assignee}`,
-    ].join('\n')
+    ]
+
+    if (teamDetails) {
+        lines.push(`Команда: ${teamDetails}`)
+    }
+
+    if (projectDetails) {
+        lines.push(`Проекты: ${projectDetails}`)
+    }
+
+    if (tagDetails) {
+        lines.push(`Теги: ${tagDetails}`)
+    }
+
+    return lines.join('\n')
 }
 
 function buildTaskActionKeyboard(task: TaskWithRelations, user: User): InlineKeyboard {
@@ -486,6 +550,11 @@ function buildTaskActionKeyboard(task: TaskWithRelations, user: User): InlineKey
         keyboard.text('Объяснить просрочку', `task-overdue:${task.id}`).row()
     }
 
+    if (task.status === 'DONE' && user.role === 'MANAGER') {
+        keyboard.text('Подтвердить выполнение', `task-review:${task.id}:APPROVE`).row()
+        keyboard.text('Вернуть на доработку', `task-review:${task.id}:REJECT`).row()
+    }
+
     keyboard.text('Прикрепить файл', `attach-task:${task.id}`).row()
 
     return keyboard
@@ -494,7 +563,7 @@ function buildTaskActionKeyboard(task: TaskWithRelations, user: User): InlineKey
 async function fetchTaskWithRelations(taskId: number): Promise<TaskWithRelations | null> {
     return prisma.task.findUnique({
         where: { id: taskId },
-        include: { assignee: true, creator: true },
+        include: TASK_RELATIONS,
     })
 }
 
@@ -515,9 +584,13 @@ async function fetchLatestTasksForUser(user: User, limit = 5): Promise<TaskWithR
             user.role === 'MANAGER'
                 ? undefined
                 : {
-                      OR: [{ creatorId: user.id }, { assigneeId: user.id }],
+                      OR: [
+                          { creatorId: user.id },
+                          { assigneeId: user.id },
+                          { assignments: { some: { userId: user.id } } },
+                      ],
                   },
-        include: { assignee: true, creator: true },
+        include: TASK_RELATIONS,
         orderBy: { updatedAt: 'desc' },
         take: limit,
     })
@@ -562,30 +635,199 @@ async function handleTaskStatusChange(ctx: BotContext, taskId: number, nextStatu
         return
     }
 
-    const data: Prisma.TaskUpdateInput = {
-        status: nextStatus,
-        statusChangedAt: new Date(),
-        completedAt: nextStatus === 'DONE' ? new Date() : null,
-    }
+    const now = new Date()
+    const updates: Prisma.TaskUpdateInput = {}
+    const historyEntries: { type: TaskHistoryType; details?: TaskHistoryDetails }[] = []
+    const previousStatus = task.status
+    const previousReviewStatus = task.completionReviewStatus
+    let nextReviewStatus: TaskCompletionReviewStatus | null = null
 
-    const updated = await prisma.task.update({
-        where: { id: task.id },
-        data,
-        include: { assignee: true, creator: true },
-    })
-
-    await logTaskHistory({
-        taskId: updated.id,
-        actorId: ctx.user.id,
+    updates.status = nextStatus
+    updates.statusChangedAt = now
+    updates.completedAt = nextStatus === 'DONE' ? now : nextStatus === 'CLOSED' ? task.completedAt ?? now : null
+    historyEntries.push({
         type: 'STATUS_CHANGE',
         details: {
-            from: task.status,
+            from: previousStatus,
             to: nextStatus,
         },
     })
 
+    if (nextStatus === 'DONE') {
+        if (ctx.user.role === 'MANAGER') {
+            nextReviewStatus = TaskCompletionReviewStatus.APPROVED
+            updates.completionReviewStatus = TaskCompletionReviewStatus.APPROVED
+            updates.completionReviewedAt = now
+            updates.completionReviewedBy = { connect: { id: ctx.user.id } }
+            updates.completionRequestedAt = task.completionRequestedAt ?? now
+        } else {
+            nextReviewStatus = TaskCompletionReviewStatus.PENDING
+            updates.completionReviewStatus = TaskCompletionReviewStatus.PENDING
+            updates.completionRequestedAt = now
+            updates.completionReviewedAt = null
+            updates.completionReviewedBy = { disconnect: true }
+        }
+    } else {
+        nextReviewStatus = TaskCompletionReviewStatus.NOT_REQUESTED
+        updates.completionReviewStatus = TaskCompletionReviewStatus.NOT_REQUESTED
+        updates.completionRequestedAt = null
+        updates.completionReviewedAt = null
+        updates.completionReviewedBy = { disconnect: true }
+    }
+
+    if (nextReviewStatus !== previousReviewStatus) {
+        historyEntries.push({
+            type: 'REVIEW_STATUS_CHANGE',
+            details: {
+                from: previousReviewStatus,
+                to: nextReviewStatus,
+                reason: nextStatus === 'DONE' && ctx.user.role !== 'MANAGER' ? 'REQUESTED_BY_ASSIGNEE' : 'STATUS_UPDATE',
+            },
+        })
+    }
+
+    const updated = await prisma.task.update({
+        where: { id: task.id },
+        data: updates,
+        include: TASK_RELATIONS,
+    })
+
+    if (historyEntries.length > 0) {
+        await Promise.all(
+            historyEntries.map((entry) =>
+                logTaskHistory({
+                    taskId: updated.id,
+                    actorId: ctx.user.id,
+                    type: entry.type,
+                    details: entry.details,
+                })
+            )
+        )
+    }
+
     await ctx.answerCallbackQuery({ text: `Статус: ${STATUS_LABELS[nextStatus]}` })
     await sendTaskDetails(ctx, updated, { edit: true })
+
+    const actorName = ctx.user.name ?? `ID ${ctx.user.id.toString()}`
+    const notifyMessage = `Статус задачи "${updated.title}" изменён на "${STATUS_LABELS[nextStatus]}" пользователем ${actorName}.`
+    await broadcastTaskNotification(updated, notifyMessage, ctx.user.id)
+}
+
+export async function sendTelegramNotification(userId: bigint | null | undefined, message: string) {
+    if (!userId) return
+
+    try {
+        await bot.api.sendMessage(Number(userId), message)
+    } catch (error) {
+        console.error('Failed to send Telegram notification', { userId: userId.toString(), error })
+    }
+}
+
+export async function broadcastTaskNotification(task: TaskWithRelations, message: string, excludeUserId?: bigint) {
+    const recipients = new Set<bigint>()
+
+    if (task.creatorId) recipients.add(task.creatorId)
+    if (task.assigneeId) recipients.add(task.assigneeId)
+
+    task.assignments?.forEach((a) => recipients.add(a.userId))
+
+    if (excludeUserId) {
+        recipients.delete(excludeUserId)
+    }
+
+    await Promise.all(
+        Array.from(recipients).map((id) => sendTelegramNotification(id, message))
+    )
+}
+
+async function handleReviewAction(ctx: BotContext, taskId: number, action: 'APPROVE' | 'REJECT') {
+    const task = await fetchTaskWithRelations(taskId)
+    if (!task) {
+        await ctx.answerCallbackQuery({ text: 'Задача не найдена', show_alert: true })
+        return
+    }
+
+    if (task.status !== 'DONE') {
+        await ctx.answerCallbackQuery({ text: 'Задача не готова к проверке', show_alert: true })
+        return
+    }
+
+    if (task.completionReviewStatus !== TaskCompletionReviewStatus.PENDING) {
+        await ctx.answerCallbackQuery({ text: 'Нет запроса на подтверждение', show_alert: true })
+        return
+    }
+
+    const now = new Date()
+    const updates: Prisma.TaskUpdateInput = {}
+    const historyEntries: { type: TaskHistoryType; details?: TaskHistoryDetails }[] = []
+    const previousStatus = task.status
+    const previousReviewStatus = task.completionReviewStatus
+    const resultingStatus: TaskStatus = action === 'APPROVE' ? 'CLOSED' : 'IN_PROGRESS'
+
+    if (action === 'APPROVE') {
+        updates.status = resultingStatus
+        updates.completedAt = task.completedAt ?? now
+        updates.completionReviewStatus = TaskCompletionReviewStatus.APPROVED
+        updates.completionReviewedAt = now
+        updates.completionReviewedBy = { connect: { id: ctx.user.id } }
+        updates.completionRequestedAt = task.completionRequestedAt ?? task.completedAt ?? now
+    } else {
+        updates.status = resultingStatus
+        updates.completedAt = null
+        updates.completionReviewStatus = TaskCompletionReviewStatus.REJECTED
+        updates.completionReviewedAt = now
+        updates.completionReviewedBy = { connect: { id: ctx.user.id } }
+    }
+
+    historyEntries.push({
+        type: 'STATUS_CHANGE',
+        details: {
+            from: previousStatus,
+            to: resultingStatus,
+        },
+    })
+
+    historyEntries.push({
+        type: 'REVIEW_STATUS_CHANGE',
+        details: {
+            from: previousReviewStatus,
+            to: updates.completionReviewStatus,
+            reason: action,
+        },
+    })
+
+    const updated = await prisma.task.update({
+        where: { id: task.id },
+        data: updates,
+        include: TASK_RELATIONS,
+    })
+
+    await Promise.all(
+        historyEntries.map((entry) =>
+            logTaskHistory({
+                taskId: updated.id,
+                actorId: ctx.user.id,
+                type: entry.type,
+                details: entry.details,
+            })
+        )
+    )
+
+    const responseText =
+        action === 'APPROVE'
+            ? 'Результат подтверждён, задача закрыта'
+            : 'Задача возвращена на доработку'
+
+    await ctx.answerCallbackQuery({ text: responseText })
+    await sendTaskDetails(ctx, updated, { edit: true })
+
+    const actorName = ctx.user.name ?? `ID ${ctx.user.id.toString()}`
+    const notifyMessage =
+        action === 'APPROVE'
+            ? `Задача "${updated.title}" закрыта. Менеджер ${actorName} подтвердил выполнение.`
+            : `Задача "${updated.title}" возвращена на доработку менеджером ${actorName}. Проверьте комментарии и обновите статус.`
+
+    await broadcastTaskNotification(updated, notifyMessage, ctx.user.id)
 }
 
 async function beginDeadlineAdjustment(ctx: BotContext, taskId: number, options: { requireReason: boolean }) {
@@ -654,7 +896,7 @@ async function completeDeadlineAdjustment(
     const updated = await prisma.task.update({
         where: { id: task.id },
         data: updates,
-        include: { assignee: true, creator: true },
+        include: TASK_RELATIONS,
     })
 
     pendingTaskDeadlineAdjustments.delete(ctx.from!.id)
@@ -724,6 +966,12 @@ async function completeDeadlineAdjustment(
         if (updated.creatorId !== ctx.user.id) {
             recipients.add(updated.creatorId)
         }
+        if (updated.assigneeId && updated.assigneeId !== ctx.user.id) {
+            recipients.add(updated.assigneeId)
+        }
+        updated.assignments?.forEach((a) => {
+            if (a.userId !== ctx.user.id) recipients.add(a.userId)
+        })
 
         if (updated.creator?.role !== 'MANAGER') {
             const excludedIds: bigint[] = [ctx.user.id]
@@ -812,6 +1060,10 @@ function canUploadAttachment(task: AttachmentTaskAccess, user: User): boolean {
         return true
     }
 
+    if (task.assignments?.some((a) => a.userId === user.id)) {
+        return true
+    }
+
     return false
 }
 
@@ -878,7 +1130,7 @@ async function handleIncomingAttachment(ctx: BotContext, descriptor: TelegramFil
             sizeBytes: descriptor.size ?? undefined,
         })
 
-        await notifyManagerAboutAttachmentUploadFromBot({
+        await notifyTeamAboutAttachment({
             taskId: pending.taskId,
             uploader: ctx.user,
             attachment,
@@ -892,7 +1144,7 @@ async function handleIncomingAttachment(ctx: BotContext, descriptor: TelegramFil
     }
 }
 
-async function notifyManagerAboutAttachmentUploadFromBot({
+async function notifyTeamAboutAttachment({
     taskId,
     uploader,
     attachment,
@@ -901,25 +1153,9 @@ async function notifyManagerAboutAttachmentUploadFromBot({
     uploader: User
     attachment: { fileName?: string | null; type: string | null }
 }) {
-    const task = await prisma.task.findUnique({
-        where: { id: taskId },
-        select: {
-            title: true,
-            creatorId: true,
-            creator: {
-                select: {
-                    role: true,
-                    name: true,
-                },
-            },
-        },
-    })
+    const task = await fetchTaskWithRelations(taskId)
 
-    if (!task || task.creator?.role !== 'MANAGER') {
-        return
-    }
-
-    if (task.creatorId === uploader.id) {
+    if (!task) {
         return
     }
 
@@ -930,11 +1166,7 @@ async function notifyManagerAboutAttachmentUploadFromBot({
         `Загрузил: ${uploaderName}.`,
     ].join('\n')
 
-    try {
-        await bot.api.sendMessage(Number(task.creatorId), message)
-    } catch (error) {
-        console.error('Failed to notify manager about attachment upload', error)
-    }
+    await broadcastTaskNotification(task, message, uploader.id)
 }
 
 async function handleDraftWithDeadline(ctx: BotContext, draft: TaskDraftWithDeadline) {
@@ -1205,6 +1437,23 @@ bot.on('callback_query:data', async (ctx) => {
         return
     }
 
+    if (data.startsWith('task-review:')) {
+        const [, taskIdRaw, action] = data.split(':')
+        const taskId = Number(taskIdRaw)
+        if (!Number.isInteger(taskId) || !action || !REVIEW_ACTIONS.has(action as 'APPROVE' | 'REJECT')) {
+            await ctx.answerCallbackQuery({ text: 'Некорректный запрос', show_alert: true })
+            return
+        }
+
+        if (ctx.user.role !== 'MANAGER') {
+            await ctx.answerCallbackQuery({ text: 'Только менеджер может подтверждать', show_alert: true })
+            return
+        }
+
+        await handleReviewAction(ctx, taskId, action as 'APPROVE' | 'REJECT')
+        return
+    }
+
     if (data === 'attach-cancel') {
         pendingAttachmentUploads.delete(ctx.from.id)
         await ctx.editMessageText('Прикрепление отменено.')
@@ -1292,16 +1541,28 @@ bot.on('callback_query:data', async (ctx) => {
     }
 
     try {
-        const task = await prisma.task.create({
-            data: {
-                title: pending.title,
-                description: pending.description,
-                creatorId: BigInt(managerId),
-                assigneeId,
-                subtasks: pending.subtasks,
-                status: 'IN_PROGRESS',
-                deadline: pending.deadline,
-            }
+        const task = await prisma.$transaction(async (tx) => {
+            const created = await tx.task.create({
+                data: {
+                    title: pending.title,
+                    description: pending.description,
+                    creatorId: BigInt(managerId),
+                    assigneeId,
+                    subtasks: pending.subtasks,
+                    status: 'IN_PROGRESS',
+                    deadline: pending.deadline,
+                },
+            })
+
+            await tx.taskAssignment.create({
+                data: {
+                    taskId: created.id,
+                    userId: assigneeId,
+                    isLead: true,
+                },
+            })
+
+            return created
         })
 
         pendingManagerTasks.delete(managerId)

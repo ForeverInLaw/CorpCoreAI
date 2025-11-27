@@ -47,8 +47,15 @@ export async function GET(request: Request) {
                 : {
                     OR: [
                         { assigneeId: BigInt(userId) },
-                        { creatorId: BigInt(userId) }
-                    ]
+                        { creatorId: BigInt(userId) },
+                        {
+                            assignments: {
+                                some: {
+                                    userId: BigInt(userId),
+                                },
+                            },
+                        },
+                    ],
                 },
             include: {
                 assignee: true,
@@ -66,6 +73,27 @@ export async function GET(request: Request) {
                         },
                     },
                 },
+                assignments: {
+                    include: {
+                        user: {
+                            select: {
+                                id: true,
+                                name: true,
+                            },
+                        },
+                    },
+                },
+                tags: {
+                    include: {
+                        tag: true,
+                    },
+                },
+                projects: {
+                    include: {
+                        project: true,
+                    },
+                },
+                completionReviewedBy: true,
             },
             orderBy: { createdAt: 'desc' }
         })
@@ -84,6 +112,11 @@ export async function GET(request: Request) {
             assigneeId: task.assigneeId?.toString() ?? null,
             assigneeName: task.assignee?.name ?? null,
             overdueReason: task.overdueReason ?? null,
+            completionReviewStatus: task.completionReviewStatus,
+            completionRequestedAt: task.completionRequestedAt?.toISOString() ?? null,
+            completionReviewedAt: task.completionReviewedAt?.toISOString() ?? null,
+            completionReviewedById: task.completionReviewedById?.toString() ?? null,
+            completionReviewedByName: task.completionReviewedBy?.name ?? null,
             attachments: task.attachments.map((attachment) => ({
                 id: attachment.id.toString(),
                 url: attachment.url,
@@ -101,12 +134,41 @@ export async function GET(request: Request) {
                 actorId: entry.actorId ? entry.actorId.toString() : null,
                 actorName: entry.actor?.name ?? (entry.actorId ? `ID ${entry.actorId.toString()}` : null),
             })),
+            assignments: task.assignments.map((assignment) => ({
+                userId: assignment.userId.toString(),
+                name: assignment.user?.name ?? `ID ${assignment.userId.toString()}`,
+                isLead: assignment.isLead,
+            })),
+            tags: task.tags
+                .map(({ tag }) => ({
+                    id: tag.id,
+                    label: tag.label,
+                    color: tag.color ?? null,
+                })),
+            projects: task.projects
+                .map(({ project }) => ({
+                    id: project.id,
+                    name: project.name,
+                    color: project.color ?? null,
+                })),
         }))
 
         const employees = isManager
             ? await prisma.user.findMany({
                 where: { role: 'EMPLOYEE' },
                 select: { id: true, name: true },
+                orderBy: [{ name: 'asc' }]
+            })
+            : []
+
+        const availableTags = isManager
+            ? await prisma.tag.findMany({
+                orderBy: [{ label: 'asc' }]
+            })
+            : []
+
+        const availableProjects = isManager
+            ? await prisma.project.findMany({
                 orderBy: [{ name: 'asc' }]
             })
             : []
@@ -121,6 +183,16 @@ export async function GET(request: Request) {
             employees: employees.map((employee) => ({
                 id: employee.id.toString(),
                 name: employee.name ?? `ID ${employee.id.toString()}`,
+            })),
+            availableTags: availableTags.map((tag) => ({
+                id: tag.id,
+                label: tag.label,
+                color: tag.color ?? null,
+            })),
+            availableProjects: availableProjects.map((project) => ({
+                id: project.id,
+                name: project.name,
+                color: project.color ?? null,
             })),
         })
     } catch (error) {
