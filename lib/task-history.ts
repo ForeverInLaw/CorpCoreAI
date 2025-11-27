@@ -44,7 +44,7 @@ export async function getTaskHistory(taskId: number) {
       createdAt: 'desc',
     },
     include: {
-      user: {
+      actor: {
         select: {
           name: true,
         },
@@ -54,6 +54,7 @@ export async function getTaskHistory(taskId: number) {
 
   return history.map((entry) => ({
     ...entry,
-    actorName: entry.user?.name ?? null,
+    type: entry.type as TaskHistoryType,
+    actorName: entry.actor?.name ?? null,
   }))
 }
