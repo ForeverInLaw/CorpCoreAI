@@ -27,7 +27,8 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN node node_modules/.bin/prisma generate && \
+    addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 
 EXPOSE 4174
@@ -46,11 +47,14 @@ WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=bot-deps /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/lib ./lib
 COPY --from=builder /app/proto ./proto
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN node node_modules/.bin/prisma generate && \
+    addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 
 CMD ["npx", "tsx", "scripts/bot.ts"]
