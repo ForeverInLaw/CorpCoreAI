@@ -75,8 +75,8 @@ const formatDetails = (
         return `${safeStringify(details.from)} ➔ ${safeStringify(details.to)}`
 
       case 'DEADLINE_CHANGE': {
-        const fromDate = details.from ? safeStringify(details.from) : 'нет'
-        const toDate = details.to ? safeStringify(details.to) : 'нет'
+        const fromDate = details.from ? formatDate(safeStringify(details.from)) : 'нет'
+        const toDate = details.to ? formatDate(safeStringify(details.to)) : 'нет'
         return `${fromDate} ➔ ${toDate}`
       }
 
