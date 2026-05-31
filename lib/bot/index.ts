@@ -152,6 +152,20 @@ type AttachmentTaskSummary = AttachmentTaskAccess & {
   status: TaskStatus
 }
 
+type TaskAccessInfo = {
+  creatorId: bigint
+  assigneeId: bigint | null
+  assignments: { userId: bigint }[]
+}
+
+function hasTaskAccess(task: TaskAccessInfo, user: User): boolean {
+  if (user.role === 'MANAGER') return true
+  if (task.creatorId === user.id) return true
+  if (task.assigneeId === user.id) return true
+  if (task.assignments?.some((a) => a.userId === user.id)) return true
+  return false
+}
+
 type TaskListResult = {
   tasks: AttachmentTaskSummary[]
   hasNext: boolean
@@ -526,23 +540,7 @@ function formatStatus(status: TaskStatus): string {
 }
 
 function canAccessTask(task: TaskWithRelations, user: User): boolean {
-  if (user.role === 'MANAGER') {
-    return true
-  }
-
-  if (task.creatorId === user.id) {
-    return true
-  }
-
-  if (task.assigneeId && task.assigneeId === user.id) {
-    return true
-  }
-
-  if (task.assignments?.some((a) => a.userId === user.id)) {
-    return true
-  }
-
-  return false
+  return hasTaskAccess(task, user)
 }
 
 function buildTaskSummaryMessage(task: TaskWithRelations): string {
@@ -1229,23 +1227,7 @@ async function sendAttachmentTaskList(
 }
 
 function canUploadAttachment(task: AttachmentTaskAccess, user: User): boolean {
-  if (user.role === 'MANAGER') {
-    return true
-  }
-
-  if (task.creatorId === user.id) {
-    return true
-  }
-
-  if (task.assigneeId && task.assigneeId === user.id) {
-    return true
-  }
-
-  if (task.assignments?.some((a) => a.userId === user.id)) {
-    return true
-  }
-
-  return false
+  return hasTaskAccess(task, user)
 }
 
 function descriptorFromDocument(
@@ -1558,9 +1540,7 @@ bot.on('message:text', async (ctx) => {
   try {
     const { title, subtasks, deadline: aiDeadline } = await parseTask(text)
     let detectedDeadline = aiDeadline ? parseIsoDeadline(aiDeadline) : null
-    if (!detectedDeadline) {
-      detectedDeadline = extractDeadlineFromText(text)
-    }
+    detectedDeadline ??= extractDeadlineFromText(text)
     const draft: TaskDraftBase = {
       title,
       description: text,
