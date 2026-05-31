@@ -3,11 +3,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        DATABASE_URL: ${DATABASE_URL}
+      target: runner
     restart: always
     ports:
-      - "3005:3000"
+      - "127.0.0.1:3005:3000"
     env_file:
       - .env
     environment:
@@ -20,9 +19,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        DATABASE_URL: ${DATABASE_URL}
-    command: ["pnpm", "bot"]
+      target: bot
+    command: ["npx", "tsx", "scripts/bot.ts"]
     restart: always
     env_file:
       - .env
@@ -36,14 +34,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        DATABASE_URL: ${DATABASE_URL}
+      target: bot
     restart: always
     command:
       - "/bin/sh"
       - "-c"
       - |-
-        pnpm reminders || echo "[reminders] Initial job failed; will try again at next schedule";
+        npx tsx scripts/reminders.ts || echo "[reminders] Initial job failed; will try again at next schedule";
         while true; do
           now=$$(date -u +%s);
           target=$$(( (now / 86400) * 86400 + 5 * 3600 )); # 05:00 UTC == 08:00 MSK
@@ -53,7 +50,7 @@ services:
           sleep_seconds=$$((target - now));
           echo "[reminders] Sleeping $$sleep_seconds seconds until next 08:00 MSK run";
           sleep $$sleep_seconds;
-          pnpm reminders || echo "[reminders] Job failed; will retry tomorrow";
+          npx tsx scripts/reminders.ts || echo "[reminders] Job failed; will retry tomorrow";
         done
     env_file:
       - .env
@@ -67,9 +64,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        DATABASE_URL: ${DATABASE_URL}
-    command: ["pnpm", "prisma", "migrate", "deploy"]
+      target: runner
+    command: ["node", "-e", "require('child_process').execSync('npx prisma migrate deploy', {stdio:'inherit'})"]
     restart: "no"
     env_file:
       - .env
