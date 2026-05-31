@@ -434,15 +434,12 @@ export class TaskUpdateService {
     if (this.nextStatus !== this.task.status) {
       this.updates.status = this.nextStatus
       this.updates.statusChangedAt = this.now
-      let completedAt: Date | null = null
       if (this.nextStatus === TaskStatus.DONE) {
-        completedAt = this.now
-      } else if (this.updates.completedAt != null) {
-        completedAt = this.updates.completedAt
-      } else if (this.nextStatus === TaskStatus.CLOSED) {
-        completedAt = this.task.completedAt
+        this.updates.completedAt = this.now
+      } else {
+        this.updates.completedAt ??=
+          this.nextStatus === TaskStatus.CLOSED ? this.task.completedAt : null
       }
-      this.updates.completedAt = completedAt
       this.historyEntries.push({
         type: 'STATUS_CHANGE',
         details: { from: this.task.status, to: this.nextStatus },
