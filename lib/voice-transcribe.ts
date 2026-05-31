@@ -134,6 +134,10 @@ export async function transcribeVoice(oggBuffer: Buffer): Promise<string> {
     const transcript =
       results.results?.[0]?.alternatives?.[0]?.transcript ?? ''
 
+    if (!transcript) {
+      console.warn('[voice] empty transcript, gRPC response:', JSON.stringify(results))
+    }
+
     return transcript
   } finally {
     await unlink(tmpOgg).catch(() => {})

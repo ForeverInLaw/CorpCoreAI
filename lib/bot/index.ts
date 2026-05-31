@@ -1863,7 +1863,9 @@ bot.on('message:voice', async (ctx) => {
     if (!res.ok) throw new Error(`Failed to download voice: ${res.status}`)
     const buffer = Buffer.from(await res.arrayBuffer())
 
+    console.log(`[voice] file_id=${ctx.message.voice.file_id} size=${buffer.length} apiKey=${process.env.NVIDIA_API_KEY?.slice(0, 8) || 'MISSING'}`)
     const text = await transcribeVoice(buffer)
+    console.log(`[voice] transcript="${text}"`)
     if (!text) {
       await ctx.reply('Не удалось распознать голосовое сообщение.')
       return
