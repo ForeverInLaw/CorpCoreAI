@@ -3,6 +3,7 @@ overrides:
   picomatch: 4.0.4
   'ip-address': 10.1.1
   'brace-expansion': 2.0.3
+  protobufjs: 7.6.1
 
 allowBuilds:
   '@prisma/engines': true
