@@ -15,15 +15,7 @@ services:
   cloudflared:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
-    entrypoint: ['sh', '-c']
-    command:
-      - |
-        if [ -z "$TUNNEL_TOKEN" ]; then
-          echo "No TUNNEL_TOKEN set, skipping"
-          sleep infinity
-        else
-          exec cloudflared tunnel run
-        fi
+    command: ['tunnel', 'run']
     env_file:
       - .env
     depends_on:
