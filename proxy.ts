@@ -3,10 +3,8 @@ import { checkRateLimit } from '@/lib/rate-limit'
 
 export function proxy(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith('/api/')) {
-    const forwarded = request.headers.get('x-forwarded-for')
-    const ip = forwarded?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown'
-    const userId = request.headers.get('Authorization') || ''
-    const identifier = userId ? `user:${userId}:${ip}` : `ip:${ip}`
+    const auth = request.headers.get('Authorization') || ''
+    const identifier = auth || request.headers.get('x-real-ip') || 'anonymous'
 
     const { rateLimited } = checkRateLimit(identifier)
     if (rateLimited) {
