@@ -7,8 +7,6 @@ COPY package.json pnpm-lock.yaml* ./
 RUN pnpm i
 
 FROM base AS builder
-ARG DATABASE_URL
-ENV DATABASE_URL=${DATABASE_URL}
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -25,6 +23,9 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/lib ./lib
+
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+USER appuser
 
 EXPOSE 3000
 ENV PORT 3000
