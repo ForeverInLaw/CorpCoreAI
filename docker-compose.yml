@@ -62,12 +62,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: bot
+      target: runner
     command:
       [
-        'node',
-        '-e',
-        "require('child_process').execSync('npx prisma migrate deploy', {stdio:'inherit'})",
+        'sh',
+        '-c',
+        'node_modules/.bin/prisma generate && node_modules/.bin/prisma migrate deploy',
       ]
     restart: 'no'
     env_file:

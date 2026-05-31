@@ -84,11 +84,7 @@ pnpm reminders
 ### External DB (Aiven, etc.)
 
 ```bash
-# Run migrations once
-docker compose --profile external run --rm migrate
-
-# Start services
-docker compose up --build app bot reminders
+docker compose --profile external up --build
 ```
 
 ### Local DB (PostgreSQL container)
@@ -122,7 +118,7 @@ The `cloudflared` service connects to Cloudflare and routes traffic to the `app`
 
 ## Deployment
 
-- **Docker (external DB):** `docker compose --profile external run --rm migrate && docker compose up --build app bot reminders`
+- **Docker (external DB):** `docker compose --profile external up --build`
 - **Docker (local DB):** `docker compose --profile local up --build`
 - **Local:** `pnpm bot` and `pnpm reminders` require a `.env` file (Docker injects via compose)
 - **Vercel/other:** Deploy the Next.js app; run bot and reminders separately
