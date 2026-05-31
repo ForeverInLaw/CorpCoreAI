@@ -1,7 +1,7 @@
 import OpenAI from 'openai'
 
 if (!process.env.NVIDIA_API_KEY) {
-    console.warn('NVIDIA_API_KEY is not defined')
+    throw new Error('NVIDIA_API_KEY is not defined')
 }
 
 const openai = new OpenAI({
@@ -62,7 +62,7 @@ export async function parseTask(text: string, referenceDate: Date = new Date()):
                     },
                     { role: "user", content: text }
                 ],
-                temperature: 1,
+                temperature: 0.1,
                 max_tokens: 8192,
                 response_format: { type: "json_object" }
             })
@@ -95,7 +95,7 @@ export async function parseTask(text: string, referenceDate: Date = new Date()):
                 return { title: parsed.title, subtasks, deadline }
             } catch (parseError) {
                 console.error(`Failed to parse AI response on attempt ${attempt}:`, content)
-                throw parseError
+                lastError = parseError
             }
         } catch (error) {
             lastError = error
