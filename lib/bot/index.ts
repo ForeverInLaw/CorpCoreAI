@@ -1856,6 +1856,8 @@ bot.on('message:photo', async (ctx) => {
 })
 
 bot.on('message:voice', async (ctx) => {
+  if (!ctx.from) return
+
   try {
     const file = await ctx.getFile()
     const url = `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${file.file_path}`
@@ -1863,15 +1865,72 @@ bot.on('message:voice', async (ctx) => {
     if (!res.ok) throw new Error(`Failed to download voice: ${res.status}`)
     const buffer = Buffer.from(await res.arrayBuffer())
 
-    console.log(`[voice] file_id=${ctx.message.voice.file_id} size=${buffer.length} apiKey=${process.env.NVIDIA_API_KEY?.slice(0, 8) || 'MISSING'}`)
     const text = await transcribeVoice(buffer)
-    console.log(`[voice] transcript="${text}"`)
     if (!text) {
       await ctx.reply('Не удалось распознать голосовое сообщение.')
       return
     }
 
-    await ctx.reply(`🎤 Распознано: ${text}`)
+    await ctx.reply(`🎤 "${text}"`)
+    await ctx.reply('Анализирую задачу...')
+
+    const userId = ctx.from.id
+    const pendingDeadline = pendingDeadlineRequests.get(userId)
+    const pendingAdjustment = pendingTaskDeadlineAdjustments.get(userId)
+
+    if (pendingAdjustment) {
+      if (pendingAdjustment.stage === 'reason') {
+        pendingTaskDeadlineAdjustments.set(
+          userId,
+          timed({ ...pendingAdjustment, stage: 'deadline', reason: text }),
+        )
+        await ctx.reply(
+          'Спасибо. Теперь отправьте новый дедлайн (YYYY-MM-DD или DD.MM.YYYY).',
+        )
+        return
+      }
+
+      const parsedDeadline = parseUserDeadlineInput(text)
+      if (!parsedDeadline) {
+        await ctx.reply(DEADLINE_INVALID_MESSAGE)
+        return
+      }
+
+      await completeDeadlineAdjustment(ctx, pendingAdjustment, parsedDeadline)
+      return
+    }
+
+    if (pendingDeadline) {
+      const parsedDeadline = extractDeadlineFromText(text)
+      if (!parsedDeadline) {
+        await ctx.reply(DEADLINE_INVALID_MESSAGE)
+        return
+      }
+
+      pendingDeadlineRequests.delete(userId)
+      await handleDraftWithDeadline(ctx, {
+        ...pendingDeadline,
+        deadline: parsedDeadline,
+      })
+      return
+    }
+
+    const { title, subtasks, deadline: aiDeadline } = await parseTask(text)
+    let detectedDeadline = aiDeadline ? parseIsoDeadline(aiDeadline) : null
+    detectedDeadline ??= extractDeadlineFromText(text)
+    const draft: TaskDraftBase = {
+      title,
+      description: text,
+      subtasks,
+    }
+
+    if (!detectedDeadline) {
+      pendingDeadlineRequests.set(userId, timed(draft))
+      await ctx.reply(DEADLINE_PROMPT_MESSAGE)
+      return
+    }
+
+    await handleDraftWithDeadline(ctx, { ...draft, deadline: detectedDeadline })
   } catch (error) {
     console.error('Voice transcription failed:', error)
     await ctx.reply('Ошибка при распознавании голосового сообщения.')
