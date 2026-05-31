@@ -84,6 +84,11 @@ model Task {
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([creatorId])
+  @@index([assigneeId])
+  @@index([status])
+  @@index([deadline])
 }
 
 model Project {
@@ -118,7 +123,7 @@ model TaskAssignment {
   isLead    Boolean  @default(false)
   assignedAt DateTime @default(now())
 
-  task Task @relation(fields: [taskId], references: [id])
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id])
 
   @@id([taskId, userId])
@@ -129,7 +134,7 @@ model TaskTag {
   taskId Int
   tagId  Int
 
-  task Task @relation(fields: [taskId], references: [id])
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
   tag  Tag  @relation(fields: [tagId], references: [id])
 
   @@id([taskId, tagId])
@@ -140,7 +145,7 @@ model TaskProject {
   taskId    Int
   projectId Int
 
-  task    Task    @relation(fields: [taskId], references: [id])
+  task    Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
   project Project @relation(fields: [projectId], references: [id])
 
   @@id([taskId, projectId])
@@ -152,7 +157,7 @@ model Attachment {
   url       String
   type      String // PDF, DOCX, IMAGE, etc.
   taskId    Int
-  task      Task     @relation(fields: [taskId], references: [id])
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
   source               AttachmentSource @default(TELEGRAM)
@@ -165,6 +170,8 @@ model Attachment {
   uploadedById         BigInt?
   uploadedBy           User?            @relation(fields: [uploadedById], references: [id])
   downloadTokens       DownloadToken[]
+
+  @@index([taskId])
 }
 
 model DownloadToken {
@@ -181,7 +188,7 @@ model DownloadToken {
 model TaskHistory {
   id        Int      @id @default(autoincrement())
   taskId    Int
-  task      Task     @relation(fields: [taskId], references: [id])
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   actorId   BigInt?
   actor     User?    @relation("TaskHistoryActor", fields: [actorId], references: [id])
   type      String
