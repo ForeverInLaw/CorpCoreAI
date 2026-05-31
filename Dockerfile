@@ -18,6 +18,7 @@ RUN npx prisma generate && pnpm run build
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+ENV DATABASE_URL="postgresql://x:x@localhost:5432/x"
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/public ./public
@@ -45,6 +46,7 @@ RUN pnpm install --prod
 FROM base AS bot
 WORKDIR /app
 ENV NODE_ENV=production
+ENV DATABASE_URL="postgresql://x:x@localhost:5432/x"
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/scripts ./scripts
