@@ -290,10 +290,15 @@ export default function Home() {
         {/* Controls */}
         <div className="flex flex-col lg:flex-row gap-4 sticky top-14 z-30 bg-background/95 backdrop-blur py-4 -mx-4 px-4 border-b border-border/40 lg:static lg:bg-transparent lg:p-0 lg:border-0 lg:items-center lg:justify-between">
            {/* Tabs: Wrap on all screens */}
-           <div className="flex gap-2 flex-wrap">
+           <div className="flex gap-2 flex-wrap" role="tablist" aria-label="Статус задач">
              {tabs.map(tab => (
                <button
                  key={tab.id}
+                 id={`tab-${tab.id}`}
+                 role="tab"
+                 aria-selected={activeTab === tab.id}
+                 aria-controls={`tabpanel-${tab.id}`}
+                 tabIndex={activeTab === tab.id ? 0 : -1}
                  onClick={() => setActiveTab(tab.id)}
                  className={`
                    flex-shrink-0 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap transition-all duration-200 border
@@ -343,7 +348,12 @@ export default function Home() {
         </div>
 
         {/* Task Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div
+          id={`tabpanel-${activeTab}`}
+          role="tabpanel"
+          aria-labelledby={`tab-${activeTab}`}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+        >
           {filteredTasks.length === 0 ? (
              <div className="col-span-full flex flex-col items-center justify-center py-12 text-center space-y-4 opacity-50">
                 <IconBriefcase className="h-12 w-12" strokeWidth={1} />
