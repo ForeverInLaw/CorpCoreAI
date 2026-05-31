@@ -81,22 +81,30 @@ pnpm reminders
 
 ## Docker
 
+### External DB (Aiven, etc.)
+
 ```bash
-docker compose up --build
+docker compose up --build app bot reminders
+```
+
+### Local DB (PostgreSQL container)
+
+```bash
+docker compose --profile local up --build
 ```
 
 Services:
 
-| Service       | Description                             |
-| ------------- | --------------------------------------- |
-| `app`         | Next.js production server (port 3000)   |
-| `bot`         | Telegram bot                            |
-| `reminders`   | Daily reminder + history cleanup job    |
-| `migrate`     | Runs `prisma migrate deploy` then exits |
-| `db`          | PostgreSQL 18                           |
-| `cloudflared` | Cloudflare Tunnel (optional)            |
+| Service       | Profile | Description                             |
+| ------------- | ------- | --------------------------------------- |
+| `app`         | —       | Next.js production server (port 3000)   |
+| `bot`         | —       | Telegram bot                            |
+| `reminders`   | —       | Daily reminder + history cleanup job    |
+| `cloudflared` | —       | Cloudflare Tunnel (optional)            |
+| `migrate`     | local   | Runs `prisma migrate deploy` then exits |
+| `db`          | local   | PostgreSQL 18                           |
 
-All services wait for `migrate` to complete before starting. The `db` service has a healthcheck (`pg_isready`).
+Services without a profile always start. Profile services (`db`, `migrate`) only start when the profile is active.
 
 ### Cloudflare Tunnel
 

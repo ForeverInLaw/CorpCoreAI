@@ -9,9 +9,6 @@ services:
       - '127.0.0.1:3000:3000'
     env_file:
       - .env
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
 
   cloudflared:
     image: cloudflare/cloudflared:latest
@@ -30,9 +27,6 @@ services:
     restart: always
     env_file:
       - .env
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
 
   reminders:
     build:
@@ -58,11 +52,10 @@ services:
         done
     env_file:
       - .env
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
 
   migrate:
+    profiles:
+      - local
     build:
       context: .
       dockerfile: Dockerfile
@@ -81,6 +74,8 @@ services:
         condition: service_healthy
 
   db:
+    profiles:
+      - local
     image: postgres:18-alpine
     restart: always
     environment:
