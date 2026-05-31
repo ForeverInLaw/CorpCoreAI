@@ -89,7 +89,7 @@ export default function Home() {
           }
           setNextCursor(data.nextCursor)
 
-          initDrafts(data.tasks)
+          useUiStore.getState().initDrafts(data.tasks)
         }
       } catch (error) {
         console.error(error)
