@@ -160,6 +160,13 @@ export const TaskCard = memo(function TaskCard({
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
+  let reviewBadgeVariant: 'default' | 'destructive' | 'secondary' = 'secondary'
+  if (task.completionReviewStatus === 'APPROVED') {
+    reviewBadgeVariant = 'default'
+  } else if (task.completionReviewStatus === 'REJECTED') {
+    reviewBadgeVariant = 'destructive'
+  }
+
   return (
     <Card className="group border-border/40 bg-card hover:border-border/80 relative shadow-sm transition-all hover:shadow-md">
       <CardHeader className="p-5 pb-3">
@@ -445,15 +452,7 @@ export const TaskCard = memo(function TaskCard({
               <div className="bg-muted/30 rounded-lg border p-3">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-sm font-medium">Ревью выполнения</span>
-                  <Badge
-                    variant={
-                      task.completionReviewStatus === 'APPROVED'
-                        ? 'default'
-                        : task.completionReviewStatus === 'REJECTED'
-                          ? 'destructive'
-                          : 'secondary'
-                    }
-                  >
+                  <Badge variant={reviewBadgeVariant}>
                     {task.completionReviewStatus}
                   </Badge>
                 </div>
@@ -516,7 +515,7 @@ export const TaskCard = memo(function TaskCard({
                       className="bg-background hover:bg-accent/50 flex items-center justify-between rounded-md border p-2 text-sm transition-colors"
                     >
                       <div className="flex items-center gap-2 overflow-hidden">
-                        <div className="bg-primary/10 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full">
+                        <div className="bg-primary/10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
                           <IconFileText className="text-primary h-4 w-4" />
                         </div>
                         <div className="flex min-w-0 flex-col">
