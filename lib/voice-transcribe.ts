@@ -85,8 +85,8 @@ async function convertOggToWav(inputPath: string): Promise<string> {
     '16000',
     '-ac',
     '1',
-    '-sample_fmt',
-    's16',
+    '-c:a',
+    'pcm_s16le',
     '-f',
     'wav',
     outputPath,
@@ -111,6 +111,7 @@ export async function transcribeVoice(oggBuffer: Buffer): Promise<string> {
     await writeFile(tmpOgg, oggBuffer)
     tmpWav = await convertOggToWav(tmpOgg)
     const wavBuffer = await readFile(tmpWav)
+    console.log(`[voice] wav converted: ${wavBuffer.length} bytes`)
 
     const client = getClient()
     const results = await new Promise<RecognizeResponse>((resolve, reject) => {
