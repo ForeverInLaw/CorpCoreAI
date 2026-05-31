@@ -33,26 +33,16 @@ export async function ensureTelegramUser({
   const targetRole = resolveRoleForTelegramId(id)
   const bigintId = BigInt(id)
 
-  const existing = await prisma.user.findUnique({ where: { id: bigintId } })
-  if (existing) {
-    if (existing.role !== targetRole || (name && name !== existing.name)) {
-      return prisma.user.update({
-        where: { id: bigintId },
-        data: {
-          role: targetRole,
-          name: name ?? existing.name,
-        },
-      })
-    }
-
-    return existing
-  }
-
-  return prisma.user.create({
-    data: {
+  return prisma.user.upsert({
+    where: { id: bigintId },
+    create: {
       id: bigintId,
       role: targetRole,
       name: name ?? null,
+    },
+    update: {
+      role: targetRole,
+      ...(name ? { name } : {}),
     },
   })
 }
