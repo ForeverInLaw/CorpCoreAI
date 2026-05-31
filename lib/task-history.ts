@@ -1,16 +1,8 @@
-import type { Prisma } from '@prisma/client'
+import type { Prisma, TaskHistoryType } from '@prisma/client'
 
 import { prisma } from './db'
 
-export type TaskHistoryType =
-  | 'STATUS_CHANGE'
-  | 'DEADLINE_CHANGE'
-  | 'ASSIGNEE_CHANGE'
-  | 'OVERDUE_REASON'
-  | 'TEAM_CHANGE'
-  | 'TAG_CHANGE'
-  | 'PROJECT_CHANGE'
-  | 'REVIEW_STATUS_CHANGE'
+export type { TaskHistoryType }
 
 export type TaskHistoryDetails = Prisma.InputJsonValue
 

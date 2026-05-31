@@ -1,16 +1,10 @@
+import type { TaskHistoryType } from '@prisma/client'
+
+export type { TaskHistoryType }
+
 export type TaskStatus = 'IN_PROGRESS' | 'DONE' | 'PAUSED' | 'OVERDUE' | 'CLOSED'
 
 export type TaskCompletionReviewStatus = 'NOT_REQUESTED' | 'PENDING' | 'APPROVED' | 'REJECTED'
-
-export type TaskHistoryType =
-  | 'STATUS_CHANGE'
-  | 'DEADLINE_CHANGE'
-  | 'ASSIGNEE_CHANGE'
-  | 'OVERDUE_REASON'
-  | 'TEAM_CHANGE'
-  | 'TAG_CHANGE'
-  | 'PROJECT_CHANGE'
-  | 'REVIEW_STATUS_CHANGE'
 
 export interface TagOption {
   id: number
