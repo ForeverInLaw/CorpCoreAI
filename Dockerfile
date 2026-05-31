@@ -27,8 +27,8 @@ COPY --from=builder /app/prisma ./prisma
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 
-EXPOSE 3000
-ENV PORT=3000
+EXPOSE 4174
+ENV PORT=4174
 ENV HOSTNAME="0.0.0.0"
 
 CMD ["node", "server.js"]

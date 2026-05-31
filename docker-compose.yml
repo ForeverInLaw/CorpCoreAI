@@ -6,9 +6,11 @@ services:
       target: runner
     restart: always
     ports:
-      - '127.0.0.1:3000:3000'
+      - '127.0.0.1:4174:4174'
     env_file:
       - .env
+    environment:
+      - PORT=4174
 
   cloudflared:
     image: cloudflare/cloudflared:latest
@@ -56,6 +58,7 @@ services:
   migrate:
     profiles:
       - local
+      - external
     build:
       context: .
       dockerfile: Dockerfile
@@ -69,9 +72,6 @@ services:
     restart: 'no'
     env_file:
       - .env
-    depends_on:
-      db:
-        condition: service_healthy
 
   db:
     profiles:

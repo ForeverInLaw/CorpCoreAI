@@ -84,6 +84,10 @@ pnpm reminders
 ### External DB (Aiven, etc.)
 
 ```bash
+# Run migrations once
+docker compose --profile external run --rm migrate
+
+# Start services
 docker compose up --build app bot reminders
 ```
 
@@ -95,16 +99,16 @@ docker compose --profile local up --build
 
 Services:
 
-| Service       | Profile | Description                             |
-| ------------- | ------- | --------------------------------------- |
-| `app`         | —       | Next.js production server (port 3000)   |
-| `bot`         | —       | Telegram bot                            |
-| `reminders`   | —       | Daily reminder + history cleanup job    |
-| `cloudflared` | —       | Cloudflare Tunnel (optional)            |
-| `migrate`     | local   | Runs `prisma migrate deploy` then exits |
-| `db`          | local   | PostgreSQL 18                           |
+| Service       | Profile           | Description                             |
+| ------------- | ----------------- | --------------------------------------- |
+| `app`         | —                 | Next.js production server (port 4174)   |
+| `bot`         | —                 | Telegram bot                            |
+| `reminders`   | —                 | Daily reminder + history cleanup job    |
+| `cloudflared` | —                 | Cloudflare Tunnel (optional)            |
+| `migrate`     | local, external   | Runs `prisma migrate deploy` then exits |
+| `db`          | local             | PostgreSQL 18                           |
 
-Services without a profile always start. Profile services (`db`, `migrate`) only start when the profile is active.
+Services without a profile always start. Profile services only start when the profile is active.
 
 ### Cloudflare Tunnel
 
@@ -118,7 +122,8 @@ The `cloudflared` service connects to Cloudflare and routes traffic to the `app`
 
 ## Deployment
 
-- **Docker:** `docker compose up --build` — all services managed by compose
+- **Docker (external DB):** `docker compose --profile external run --rm migrate && docker compose up --build app bot reminders`
+- **Docker (local DB):** `docker compose --profile local up --build`
 - **Local:** `pnpm bot` and `pnpm reminders` require a `.env` file (Docker injects via compose)
 - **Vercel/other:** Deploy the Next.js app; run bot and reminders separately
 
