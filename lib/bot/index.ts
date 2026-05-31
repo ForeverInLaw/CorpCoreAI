@@ -357,7 +357,7 @@ function extractRelativeDeadline(rawText: string): Date | null {
     }
   }
 
-  const inWeeksMatch = /через\s+(\d+)\s+недел(?:ю|и)/.exec(text)
+  const inWeeksMatch = /через\s+(\d+)\s+недел[юи]/.exec(text)
   if (inWeeksMatch) {
     const weeksAhead = Number(inWeeksMatch[1])
     if (!Number.isNaN(weeksAhead) && weeksAhead >= 0) {
