@@ -46,6 +46,8 @@ model User {
   uploadedFiles Attachment[]
   historyEntries TaskHistory[] @relation("TaskHistoryActor")
   completionReviews Task[] @relation("TaskCompletionReviewer")
+
+  @@index([role])
 }
 
 model Task {
@@ -177,7 +179,7 @@ model Attachment {
 model DownloadToken {
   token        String     @id @default(uuid())
   attachmentId Int
-  attachment   Attachment @relation(fields: [attachmentId], references: [id])
+  attachment   Attachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
   expiresAt    DateTime
   createdAt    DateTime   @default(now())
 

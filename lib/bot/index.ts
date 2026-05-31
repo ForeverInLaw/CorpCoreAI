@@ -73,20 +73,35 @@ const TASK_RELATIONS = {
 
 type TaskWithRelations = Prisma.TaskGetPayload<{ include: typeof TASK_RELATIONS }>
 
-const pendingManagerTasks = new Map<number, TaskDraftWithDeadline>()
-const pendingDeadlineRequests = new Map<number, TaskDraftBase>()
-const pendingAttachmentUploads = new Map<number, { taskId: number }>()
+type TimedEntry<T> = T & { createdAt: number }
+
+function timed<T>(value: T): TimedEntry<T> {
+    return { ...value, createdAt: Date.now() }
+}
+
+function cleanupMap<K, T>(map: Map<K, TimedEntry<T>>, ttlMs: number) {
+    const now = Date.now()
+    for (const [key, entry] of map) {
+        if (now - entry.createdAt > ttlMs) {
+            map.delete(key)
+        }
+    }
+}
+
+const pendingManagerTasks = new Map<number, TimedEntry<TaskDraftWithDeadline>>()
+const pendingDeadlineRequests = new Map<number, TimedEntry<TaskDraftBase>>()
+const pendingAttachmentUploads = new Map<number, TimedEntry<{ taskId: number }>>()
 const pendingTaskDeadlineAdjustments = new Map<
     number,
-    { taskId: number; stage: 'reason' | 'deadline'; reason?: string; initiatedByManager: boolean }
+    TimedEntry<{ taskId: number; stage: 'reason' | 'deadline'; reason?: string; initiatedByManager: boolean }>
 >()
 
 const MAPS_TTL_MS = 30 * 60 * 1000
 setInterval(() => {
-    pendingManagerTasks.clear()
-    pendingDeadlineRequests.clear()
-    pendingAttachmentUploads.clear()
-    pendingTaskDeadlineAdjustments.clear()
+    cleanupMap(pendingManagerTasks, MAPS_TTL_MS)
+    cleanupMap(pendingDeadlineRequests, MAPS_TTL_MS)
+    cleanupMap(pendingAttachmentUploads, MAPS_TTL_MS)
+    cleanupMap(pendingTaskDeadlineAdjustments, MAPS_TTL_MS)
 }, MAPS_TTL_MS)
 
 const mainKeyboard = new Keyboard().text('Мои задачи').row().text('Прикрепить файл').resized()
@@ -828,11 +843,11 @@ async function beginDeadlineAdjustment(ctx: BotContext, taskId: number, options:
         return
     }
 
-    pendingTaskDeadlineAdjustments.set(ctx.from!.id, {
+    pendingTaskDeadlineAdjustments.set(ctx.from!.id, timed({
         taskId: task.id,
         stage: options.requireReason ? 'reason' : 'deadline',
         initiatedByManager: !options.requireReason,
-    })
+    }))
 
     if (options.requireReason) {
         await ctx.reply('Опишите причину просрочки текстом. После этого я попрошу новый дедлайн.')
@@ -1174,7 +1189,7 @@ async function handleDraftWithDeadline(ctx: BotContext, draft: TaskDraftWithDead
             return
         }
 
-        pendingManagerTasks.set(userId, draft)
+        pendingManagerTasks.set(userId, timed(draft))
 
         const keyboard = new InlineKeyboard()
 
@@ -1294,11 +1309,11 @@ bot.on('message:text', async (ctx) => {
                 await ctx.reply('Причина не может быть пустой. Попробуйте ещё раз.')
                 return
             }
-            pendingTaskDeadlineAdjustments.set(userId, {
+            pendingTaskDeadlineAdjustments.set(userId, timed({
                 ...pendingAdjustment,
                 stage: 'deadline',
                 reason: text,
-            })
+            }))
             await ctx.reply('Спасибо. Теперь отправьте новый дедлайн (YYYY-MM-DD или DD.MM.YYYY).')
             return
         }
@@ -1343,7 +1358,7 @@ bot.on('message:text', async (ctx) => {
         }
 
         if (!detectedDeadline) {
-            pendingDeadlineRequests.set(userId, draft)
+            pendingDeadlineRequests.set(userId, timed(draft))
             await ctx.reply(DEADLINE_PROMPT_MESSAGE)
             return
         }
@@ -1485,7 +1500,7 @@ bot.on('callback_query:data', async (ctx) => {
             return
         }
 
-        pendingAttachmentUploads.set(ctx.from.id, { taskId })
+        pendingAttachmentUploads.set(ctx.from.id, timed({ taskId }))
         await ctx.answerCallbackQuery({ text: `Задача #${taskId} выбрана` })
         await ctx.reply(ATTACHMENT_INSTRUCTIONS)
         return
