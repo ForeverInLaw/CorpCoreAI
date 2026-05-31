@@ -118,9 +118,10 @@ export async function transcribeVoice(oggBuffer: Buffer): Promise<string> {
       client.Recognize(
         {
           config: {
-            encoding: 'LINEAR_PCM',
+            encoding: 1,
             sample_rate_hertz: 16000,
             language_code: 'multi',
+            max_alternatives: 1,
             enable_automatic_punctuation: true,
           },
           audio: wavBuffer,
