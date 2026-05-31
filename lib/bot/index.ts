@@ -112,31 +112,6 @@ type TaskListResult = {
     hasNext: boolean
 }
 
-function hasTaskAccess(creatorId: bigint, assigneeId: bigint | null, user: User): boolean {
-    // This function seems unused or needs to be updated if used.
-    // Based on the code structure, access checks are mostly done via canAccessTask or query filters.
-    // We'll keep it simple for now or remove it if unused. 
-    // Checking usage: it appears unused in the main logic flows I examined, 
-    // but to be safe I'll update it to fail safe or leave as is if not called.
-    // Actually, let's update it to be correct conceptually even if unused, 
-    // but it lacks assignments data. 
-    // Since I can't change signature easily without finding callers (none found in my read), 
-    // I will assume canAccessTask is the primary one.
-    if (user.role === 'MANAGER') {
-        return true
-    }
-
-    if (creatorId === user.id) {
-        return true
-    }
-
-    if (assigneeId && assigneeId === user.id) {
-        return true
-    }
-
-    return false
-}
-
 type TelegramFileDescriptor = {
     fileId: string
     uniqueFileId?: string | null
@@ -212,6 +187,10 @@ const WEEKDAY_NAME_MAP: Record<string, number> = {
     воскресенье: 0,
     воскресенья: 0,
     вс: 0,
+}
+
+function escapeMarkdown(text: string): string {
+    return text.replace(/([_*`\[])/g, '\\$1')
 }
 
 function formatDeadlineForDisplay(date: Date): string {
@@ -1231,8 +1210,8 @@ async function createTaskForAssignee(ctx: BotContext, draft: TaskDraftWithDeadli
         },
     })
 
-    const subtaskList = draft.subtasks.map((s: string) => `- ${s}`).join('\n') || '—'
-    const message = `Задача создана!\n\n*${task.title}*\nДедлайн: ${formatDeadlineForDisplay(draft.deadline)}\n\nПодзадачи:\n${subtaskList}`
+    const subtaskList = draft.subtasks.map((s: string) => `- ${escapeMarkdown(s)}`).join('\n') || '—'
+    const message = `Задача создана!\n\n*${escapeMarkdown(task.title)}*\nДедлайн: ${formatDeadlineForDisplay(draft.deadline)}\n\nПодзадачи:\n${subtaskList}`
 
     await ctx.reply(message, { parse_mode: 'Markdown' })
 }
@@ -1406,6 +1385,12 @@ bot.on('callback_query:data', async (ctx) => {
         const taskId = Number(taskIdRaw)
         if (!Number.isInteger(taskId) || !statusRaw) {
             await ctx.answerCallbackQuery({ text: 'Некорректный запрос', show_alert: true })
+            return
+        }
+
+        const validStatuses = new Set<TaskStatus>([...STATUS_ACTIONS, 'OVERDUE', 'CLOSED'])
+        if (!validStatuses.has(statusRaw as TaskStatus)) {
+            await ctx.answerCallbackQuery({ text: 'Некорректный статус', show_alert: true })
             return
         }
 
