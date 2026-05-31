@@ -131,7 +131,6 @@ type TelegramFileDescriptor = {
 const DEADLINE_PROMPT_MESSAGE = 'Дедлайн не найден. Пожалуйста, отправьте дату в формате YYYY-MM-DD или DD.MM.YYYY (. / допускается).'
 const DEADLINE_INVALID_MESSAGE = 'Не удалось распознать дату или она уже прошла. Укажите дедлайн в формате YYYY-MM-DD или DD.MM.YYYY.'
 const ATTACHMENT_INSTRUCTIONS = 'Пришлите документ или изображение — я привяжу его к задаче.'
-const TASK_SELECTION_PROMPT = 'Выберите задачу, к которой нужно прикрепить файл:'
 const TASK_EMPTY_MESSAGE = 'У вас пока нет задач, к которым можно прикрепить файл.'
 // TODO: check if used
 const MONTH_NAME_MAP: Record<string, number> = {
@@ -254,7 +253,7 @@ function extractDeadlineFromText(text: string): Date | null {
     if (dmMatch) {
         const [, dayRaw, monthRaw] = dmMatch
         const now = new Date()
-        let year = now.getUTCFullYear()
+        const year = now.getUTCFullYear()
         let candidate = createUtcDate(year, Number(monthRaw), Number(dayRaw))
         if (candidate) {
             if (ensureFutureOrToday(candidate)) {

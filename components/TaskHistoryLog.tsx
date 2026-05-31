@@ -12,13 +12,13 @@ import {
   Tag,
   Briefcase
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import type { LucideIcon } from 'lucide-react'
 
 interface TaskHistoryLogProps {
   history: TaskHistoryEntry[]
 }
 
-const HISTORY_ICONS: Record<TaskHistoryType, any> = {
+const HISTORY_ICONS: Record<TaskHistoryType, LucideIcon> = {
   STATUS_CHANGE: CheckCircle2,
   DEADLINE_CHANGE: CalendarDays,
   ASSIGNEE_CHANGE: User,
@@ -58,7 +58,7 @@ const formatDateTime = (dateString: string) => {
 }
 
 // Helper to format details safely
-const formatDetails = (type: TaskHistoryType, details: any): string => {
+const formatDetails = (type: TaskHistoryType, details: Record<string, unknown> | null | undefined): string => {
   if (!details) return ''
 
   try {
@@ -67,8 +67,8 @@ const formatDetails = (type: TaskHistoryType, details: any): string => {
         return `${details.from ?? '...'} ➔ ${details.to ?? '...'}`
       
       case 'DEADLINE_CHANGE':
-        const fromDate = details.from ? formatDate(details.from) : 'нет'
-        const toDate = details.to ? formatDate(details.to) : 'нет'
+        const fromDate = details.from ? formatDate(String(details.from)) : 'нет'
+        const toDate = details.to ? formatDate(String(details.to)) : 'нет'
         return `${fromDate} ➔ ${toDate}`
       
       case 'ASSIGNEE_CHANGE':
@@ -88,7 +88,7 @@ const formatDetails = (type: TaskHistoryType, details: any): string => {
       default:
         return JSON.stringify(details)
     }
-  } catch (e) {
+  } catch {
     return 'Детали изменения недоступны'
   }
 }

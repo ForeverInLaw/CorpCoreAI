@@ -1,18 +1,14 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import type { ComponentProps, Dispatch, SetStateAction } from 'react'
 import { 
   Search, 
   RefreshCw, 
-  Filter, 
   Briefcase,
   LogOut,
-  ShieldCheck,
   User as UserIcon
 } from 'lucide-react'
 
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -29,8 +25,6 @@ import type {
   TaskStatus, 
   UserPayload, 
   EmployeeOption, 
-  TagOption, 
-  ProjectOption, 
   TaskAssignmentMember, 
   Attachment,
   TasksResponse
@@ -45,40 +39,31 @@ export default function Home() {
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [currentUser, setCurrentUser] = useState<UserPayload | null>(null)
   const [employees, setEmployees] = useState<EmployeeOption[]>([])
-  const [availableTags, setAvailableTags] = useState<TagOption[]>([])
-  const [availableProjects, setAvailableProjects] = useState<ProjectOption[]>([])
   
   // Filters
   const [selectedAssignee, setSelectedAssignee] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
-  const [onlyOverdueReasons, setOnlyOverdueReasons] = useState(false)
 
   // Errors & Status
   const [accessDenied, setAccessDenied] = useState(false)
-  const [fetchError, setFetchError] = useState<string | null>(null)
   
   // Drafts & Ops State
   const [uploadingTaskId, setUploadingTaskId] = useState<string | null>(null)
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({})
   const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null)
-  const [downloadErrors, setDownloadErrors] = useState<Record<string, string>>({})
+  const [, setDownloadErrors] = useState<Record<string, string>>({})
   const [deadlineDrafts, setDeadlineDrafts] = useState<Record<string, string>>({})
   const [updatingTasks, setUpdatingTasks] = useState<Record<string, boolean>>({})
   const [updateErrors, setUpdateErrors] = useState<Record<string, string>>({})
   const [teamDrafts, setTeamDrafts] = useState<Record<string, TaskAssignmentMember[]>>({})
-  const [teamAddSelections, setTeamAddSelections] = useState<Record<string, Record<string, boolean>>>({})
   const [teamErrors, setTeamErrors] = useState<Record<string, string>>({})
-  const [tagDrafts, setTagDrafts] = useState<Record<string, number[]>>({})
-  const [tagErrors, setTagErrors] = useState<Record<string, string>>({})
-  const [projectDrafts, setProjectDrafts] = useState<Record<string, number[]>>({})
-  const [projectErrors, setProjectErrors] = useState<Record<string, string>>({})
   
   const telegramInitDataRef = useRef<string | null>(null)
 
   useEffect(() => {
     // Strict production check: Must be inside Telegram WebApp
-    if (globalThis.window !== undefined && (globalThis.window as any).Telegram?.WebApp) {
-      const tg = (globalThis.window as any).Telegram.WebApp
+    if (globalThis.window !== undefined && (globalThis.window as { Telegram?: { WebApp?: unknown } }).Telegram?.WebApp) {
+      const tg = (globalThis.window as unknown as { Telegram: { WebApp: { ready: () => void; expand: () => void; initData: string } } }).Telegram.WebApp
       tg.ready()
       tg.expand() 
 
@@ -95,7 +80,6 @@ export default function Home() {
   }, [])
 
   const fetchTasks = async (initData: string, cursor?: string) => {
-    setFetchError(null)
     if (!cursor) setLoading(true)
     else setLoadingMore(true)
     telegramInitDataRef.current = initData
@@ -119,34 +103,25 @@ export default function Home() {
           setTasks(data.tasks)
           setCurrentUser(data.user)
           setEmployees(data.employees ?? [])
-          setAvailableTags(data.availableTags ?? [])
-          setAvailableProjects(data.availableProjects ?? [])
         }
         setNextCursor(data.nextCursor)
 
         // Initialize Drafts for new tasks
         const dDraftsUpdate: Record<string, string> = {}
         const tDraftsUpdate: Record<string, TaskAssignmentMember[]> = {}
-        const tagDraftsUpdate: Record<string, number[]> = {}
-        const projDraftsUpdate: Record<string, number[]> = {}
 
         data.tasks.forEach((task) => {
           dDraftsUpdate[task.id] = task.deadline ? task.deadline.slice(0, 10) : ''
           tDraftsUpdate[task.id] = (task.assignments ?? []).map((member) => ({ ...member }))
-          tagDraftsUpdate[task.id] = (task.tags ?? []).map((tag) => tag.id)
-          projDraftsUpdate[task.id] = (task.projects ?? []).map((project) => project.id)
         })
 
         setDeadlineDrafts((prev) => ({ ...prev, ...dDraftsUpdate }))
         setTeamDrafts((prev) => ({ ...prev, ...tDraftsUpdate }))
-        setTagDrafts((prev) => ({ ...prev, ...tagDraftsUpdate }))
-        setProjectDrafts((prev) => ({ ...prev, ...projDraftsUpdate }))
       } else {
-        setFetchError('Не удалось загрузить задачи')
+        // Non-OK response
       }
     } catch (error) {
       console.error(error)
-      setFetchError('Ошибка соединения')
     } finally {
       setLoading(false)
       setLoadingMore(false)
@@ -213,7 +188,7 @@ export default function Home() {
 
       if (!response.ok) throw new Error('Upload failed')
       await fetchTasks(telegramInitDataRef.current)
-    } catch (error) {
+    } catch {
       setUploadErrors((prev) => ({ ...prev, [taskId]: 'Ошибка загрузки' }))
     } finally {
       setUploadingTaskId(null)
@@ -236,7 +211,7 @@ export default function Home() {
       setDownloadingAttachmentId(attachment.id)
       const url = await requestDownloadUrl(attachment.id)
       window.open(url, '_blank')
-    } catch (e) {
+    } catch {
       setDownloadErrors(prev => ({...prev, [attachment.id]: 'Ошибка скачивания'}))
     } finally {
       setDownloadingAttachmentId(null)
@@ -420,25 +395,17 @@ export default function Home() {
                 task={task}
                 currentUser={currentUser}
                 employees={employees}
-                availableTags={availableTags}
-                availableProjects={availableProjects}
                 isManager={isManager}
                 
                 // State Props
                 teamDraft={teamDrafts[task.id] ?? []}
-                teamSelectionMap={teamAddSelections[task.id] ?? {}}
-                tagDraft={tagDrafts[task.id] ?? []}
-                projectDraft={projectDrafts[task.id] ?? []}
                 deadlineDraft={deadlineDrafts[task.id] ?? ''}
                 
                 // Status
                 isUpdating={!!updatingTasks[task.id]}
                 updateError={updateErrors[task.id]}
                 teamError={teamErrors[task.id]}
-                tagError={tagErrors[task.id]}
-                projectError={projectErrors[task.id]}
                 uploadError={uploadErrors[task.id]}
-                downloadError={downloadErrors[task.id]}
                 downloadingAttachmentId={downloadingAttachmentId}
                 uploadingTaskId={uploadingTaskId}
 
@@ -449,24 +416,12 @@ export default function Home() {
                    const d = deadlineDrafts[task.id]; 
                    await handleTaskUpdate(task.id, { deadline: d ? `${d}T00:00:00.000Z` : null })
                 }}
-                onDeadlineClear={() => handleTaskUpdate(task.id, { deadline: null })}
                 onAssigneeChange={(id) => handleTaskUpdate(task.id, { assigneeId: id === 'unassigned' ? null : id })}
                 
                 onTeamReset={() => setTeamDrafts(p => ({...p, [task.id]: (task.assignments ?? []).map(m => ({...m}))}))}
                 onTeamSave={() => handleTeamSave(task.id)}
                 onTeamAddMember={(uid) => handleTeamAddMember(task.id, uid)}
                 onTeamRemoveMember={(uid) => updateTeamDraft(task.id, curr => curr.filter(m => m.userId !== uid))}
-                onTeamSetLead={(uid) => updateTeamDraft(task.id, curr => curr.map(m => ({...m, isLead: m.userId === uid})))}
-                onTeamSelectionChange={() => {}} // Not used in compact view for now
-                onTeamAddSelected={() => {}} // Not used in compact view
-                
-                onTagToggle={() => {}} // TODO: Add tag toggle logic if needed in card
-                onTagReset={() => {}}
-                onTagSave={() => {}}
-                
-                onProjectToggle={() => {}}
-                onProjectReset={() => {}}
-                onProjectSave={() => {}}
                 
                 onReviewAction={(action) => handleTaskUpdate(task.id, { reviewAction: action })}
                 onFileUpload={(f) => handleFileUpload(task.id, f)}

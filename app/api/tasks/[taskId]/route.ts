@@ -170,7 +170,7 @@ export async function PATCH(
   let normalizedTagIds: number[] | undefined
   let normalizedProjectIds: number[] | undefined
   let reviewAction: ReviewAction | undefined
-  let teamHistoryBefore = task.assignments.map((assignment) => ({
+  const teamHistoryBefore = task.assignments.map((assignment) => ({
     userId: assignment.userId.toString(),
     name: assignment.user?.name ?? `ID ${assignment.userId.toString()}`,
     isLead: assignment.isLead,

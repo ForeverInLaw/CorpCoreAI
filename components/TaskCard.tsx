@@ -2,17 +2,13 @@
 
 import { useState, useRef } from 'react'
 import { 
-  Calendar, 
   Clock, 
   MoreVertical, 
   Paperclip, 
   User, 
-  Users, 
   CheckCircle2, 
   AlertCircle,
   FileText,
-  Tag,
-  Briefcase,
   Shield,
   X
 } from 'lucide-react'
@@ -45,8 +41,6 @@ import type {
   TaskStatus, 
   UserPayload, 
   EmployeeOption, 
-  TagOption, 
-  ProjectOption, 
   TaskAssignmentMember,
   Attachment
 } from '@/types/tasks'
@@ -57,25 +51,17 @@ interface TaskCardProps {
   task: Task
   currentUser: UserPayload | null
   employees: EmployeeOption[]
-  availableTags: TagOption[]
-  availableProjects: ProjectOption[]
   
   // State Props (passed from parent to maintain logic)
   isManager: boolean
   teamDraft: TaskAssignmentMember[]
-  teamSelectionMap: Record<string, boolean>
-  tagDraft: number[]
-  projectDraft: number[]
   deadlineDraft: string
   
   // Status & Errors
   isUpdating: boolean
   updateError?: string
   teamError?: string
-  tagError?: string
-  projectError?: string
   uploadError?: string
-  downloadError?: string
   downloadingAttachmentId: string | null
   uploadingTaskId: string | null
   
@@ -83,24 +69,12 @@ interface TaskCardProps {
   onStatusChange: (status: TaskStatus) => void
   onDeadlineChange: (date: string) => void
   onDeadlineSave: () => void
-  onDeadlineClear: () => void
   onAssigneeChange: (assigneeId: string) => void
   
   onTeamReset: () => void
   onTeamSave: () => void
   onTeamAddMember: (userId: string) => void
   onTeamRemoveMember: (userId: string) => void
-  onTeamSetLead: (userId: string) => void
-  onTeamSelectionChange: (userId: string, checked: boolean) => void
-  onTeamAddSelected: () => void
-  
-  onTagToggle: (tagId: number) => void
-  onTagReset: () => void
-  onTagSave: () => void
-  
-  onProjectToggle: (projectId: number) => void
-  onProjectReset: () => void
-  onProjectSave: () => void
   
   onReviewAction: (action: 'APPROVE' | 'REJECT') => void
   
@@ -108,7 +82,7 @@ interface TaskCardProps {
   onFileDownload: (attachment: Attachment) => void
 }
 
-const STATUS_CONFIG: Record<TaskStatus, { label: string; color: string; icon: any }> = {
+const STATUS_CONFIG: Record<TaskStatus, { label: string; color: string; icon: typeof Clock }> = {
   IN_PROGRESS: { label: 'In Progress', color: 'bg-blue-500/10 text-blue-600 border-blue-200', icon: Clock },
   DONE: { label: 'Done', color: 'bg-emerald-500/10 text-emerald-600 border-emerald-200', icon: CheckCircle2 },
   PAUSED: { label: 'Paused', color: 'bg-amber-500/10 text-amber-600 border-amber-200', icon: AlertCircle },
@@ -120,41 +94,23 @@ export function TaskCard({
   task,
   currentUser,
   employees,
-  availableTags,
-  availableProjects,
   isManager,
   teamDraft,
-  teamSelectionMap,
-  tagDraft,
-  projectDraft,
   deadlineDraft,
   isUpdating,
   updateError,
   teamError,
-  tagError,
-  projectError,
   uploadError,
-  downloadError,
   downloadingAttachmentId,
   uploadingTaskId,
   onStatusChange,
   onDeadlineChange,
   onDeadlineSave,
-  onDeadlineClear,
   onAssigneeChange,
   onTeamReset,
   onTeamSave,
   onTeamAddMember,
   onTeamRemoveMember,
-  onTeamSetLead,
-  onTeamSelectionChange,
-  onTeamAddSelected,
-  onTagToggle,
-  onTagReset,
-  onTagSave,
-  onProjectToggle,
-  onProjectReset,
-  onProjectSave,
   onReviewAction,
   onFileUpload,
   onFileDownload
