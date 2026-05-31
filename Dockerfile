@@ -28,8 +28,7 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
-RUN npx prisma generate && \
-    addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 
 EXPOSE 4174
@@ -53,7 +52,7 @@ COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/lib ./lib
 COPY --from=builder /app/proto ./proto
 
-RUN npx prisma generate && \
+RUN rm -rf node_modules/.pnpm/*/.prisma && npx prisma generate && \
     addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 
