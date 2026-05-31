@@ -17,6 +17,10 @@ function isTelegramAttachment(url: string | null | undefined) {
   return typeof url === 'string' && url.startsWith('telegram-file://')
 }
 
+function sanitizeFileName(name: string): string {
+  return name.replace(/["\r\n]/g, '_')
+}
+
 async function fetchTelegramFile(telegramFileId: string) {
   const response = await fetch(`${TELEGRAM_API_BASE}/getFile?file_id=${encodeURIComponent(telegramFileId)}`)
   if (!response.ok) {
@@ -56,7 +60,8 @@ export async function GET(request: Request, context: { params: Promise<{ token: 
     try {
       const fileResponse = await fetchTelegramFile(attachment.telegramFileId)
       const headers = new Headers(fileResponse.headers)
-      headers.set('Content-Disposition', `inline; filename="${attachment.fileName ?? attachment.type}"`)
+      headers.set('Content-Disposition', `attachment; filename="${sanitizeFileName(attachment.fileName ?? attachment.type)}"`)
+      headers.set('X-Content-Type-Options', 'nosniff')
       headers.set('X-Accel-Buffering', 'no')
       return new NextResponse(fileResponse.body, {
         status: fileResponse.status,
@@ -79,7 +84,8 @@ export async function GET(request: Request, context: { params: Promise<{ token: 
     if (attachment.mimeType) {
       headers.set('Content-Type', attachment.mimeType)
     }
-    headers.set('Content-Disposition', `inline; filename="${attachment.fileName ?? attachment.type}"`)
+    headers.set('Content-Disposition', `attachment; filename="${sanitizeFileName(attachment.fileName ?? attachment.type)}"`)
+    headers.set('X-Content-Type-Options', 'nosniff')
     headers.set('Content-Length', buffer.byteLength.toString())
     return new NextResponse(buffer, { status: 200, headers })
   } catch (error) {
