@@ -65,15 +65,16 @@ const formatDetails = (
   try {
     switch (type) {
       case 'STATUS_CHANGE':
-        return `${details.from ?? '...'} ➔ ${details.to ?? '...'}`
+        return `${String(details.from ?? '...')} ➔ ${String(details.to ?? '...')}`
 
-      case 'DEADLINE_CHANGE':
+      case 'DEADLINE_CHANGE': {
         const fromDate = details.from ? formatDate(String(details.from)) : 'нет'
         const toDate = details.to ? formatDate(String(details.to)) : 'нет'
         return `${fromDate} ➔ ${toDate}`
+      }
 
       case 'ASSIGNEE_CHANGE':
-        return `${details.fromName ?? 'Не назначен'} ➔ ${details.toName ?? 'Не назначен'}`
+        return `${String(details.fromName ?? 'Не назначен')} ➔ ${String(details.toName ?? 'Не назначен')}`
 
       case 'TEAM_CHANGE':
         // This might be complex json, let's simplify
@@ -84,7 +85,7 @@ const formatDetails = (
         return 'Обновлен список'
 
       case 'REVIEW_STATUS_CHANGE':
-        return `${details.from ?? '...'} ➔ ${details.to ?? '...'}`
+        return `${String(details.from ?? '...')} ➔ ${String(details.to ?? '...')}`
 
       default:
         return JSON.stringify(details)
@@ -94,7 +95,7 @@ const formatDetails = (
   }
 }
 
-export function TaskHistoryLog({ history }: TaskHistoryLogProps) {
+export function TaskHistoryLog({ history }: Readonly<TaskHistoryLogProps>) {
   if (!history || history.length === 0) {
     return (
       <div className="text-muted-foreground text-xs italic">
