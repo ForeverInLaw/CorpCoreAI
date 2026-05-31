@@ -13,9 +13,12 @@ const RIVA_FUNCTION_ID =
   process.env.RIVA_WHISPER_FUNCTION_ID ??
   'b702f636-f60c-4a3d-a6f4-f3568c13bd7d'
 
-let cachedClient: InstanceType<
-  ReturnType<typeof loadRivaClient>
-> | null = null
+let cachedClient: grpc.Client & {
+  Recognize: (
+    request: unknown,
+    callback: (err: grpc.ServiceError | null, response?: unknown) => void,
+  ) => void
+} | null = null
 
 function loadRivaClient() {
   const protoDir = join(process.cwd(), 'proto')
@@ -28,11 +31,17 @@ function loadRivaClient() {
     includeDirs: [protoDir],
   })
 
-  const proto = grpc.loadPackageDefinition(packageDef).nvidia.riva.asr as {
-    RivaSpeechRecognition: new (
-      address: string,
-      credentials: grpc.ChannelCredentials,
-    ) => InstanceType<typeof grpc.Client>
+  const loaded = grpc.loadPackageDefinition(packageDef)
+  const asrNs = loaded.nvidia as grpc.GrpcObject | undefined
+  const rivaNs = asrNs?.riva as grpc.GrpcObject | undefined
+  const asrService = rivaNs?.asr as grpc.GrpcObject | undefined
+  const Ctor = asrService
+    ?.RivaSpeechRecognition as
+    | typeof grpc.Client
+    | undefined
+
+  if (!Ctor) {
+    throw new Error('Failed to load RivaSpeechRecognition proto definition')
   }
 
   const tlsCreds = grpc.credentials.createSsl()
@@ -51,7 +60,12 @@ function loadRivaClient() {
     callCreds,
   )
 
-  return new proto.RivaSpeechRecognition(RIVA_HOST, combined)
+  return new Ctor(RIVA_HOST, combined) as grpc.Client & {
+    Recognize: (
+      request: unknown,
+      callback: (err: grpc.ServiceError | null, response?: unknown) => void,
+    ) => void
+  }
 }
 
 function getClient() {
@@ -87,7 +101,10 @@ interface RecognizeResponse {
 }
 
 export async function transcribeVoice(oggBuffer: Buffer): Promise<string> {
-  const tmpOgg = join(tmpdir(), `voice-${Date.now()}-${Math.random().toString(36).slice(2)}.ogg`)
+  const tmpOgg = join(
+    tmpdir(),
+    `voice-${Date.now()}-${Math.random().toString(36).slice(2)}.ogg`,
+  )
   let tmpWav: string | null = null
 
   try {
@@ -107,9 +124,9 @@ export async function transcribeVoice(oggBuffer: Buffer): Promise<string> {
           },
           audio: wavBuffer,
         },
-        (err: grpc.ServiceError | null, response: RecognizeResponse) => {
+        (err, response) => {
           if (err) reject(err)
-          else resolve(response)
+          else resolve(response as RecognizeResponse)
         },
       )
     })
