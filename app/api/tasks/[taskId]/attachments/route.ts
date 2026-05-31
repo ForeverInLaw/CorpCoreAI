@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { randomUUID } from 'node:crypto'
-import { writeFile } from 'node:fs/promises'
+import { Readable } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
+import { createWriteStream } from 'node:fs'
 
 import { prisma } from '@/lib/db'
 import { validateTelegramWebAppData } from '@/lib/auth'
@@ -133,8 +135,8 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
     const destPath = buildStoredFilePath(uniqueName)
     const storagePath = toRelativeStoragePath(destPath)
 
-    const buffer = Buffer.from(await file.arrayBuffer())
-    await writeFile(destPath, buffer)
+    const nodeStream = Readable.fromWeb(file.stream() as import('node:stream/web').ReadableStream)
+    await pipeline(nodeStream, createWriteStream(destPath))
 
     const attachment = await saveExternalAttachment({
       taskId,
