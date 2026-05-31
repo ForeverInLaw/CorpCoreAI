@@ -205,6 +205,12 @@ export default function Home() {
     })
   }, [tasks, activeTab, selectedAssignee, searchQuery])
 
+  const tabCounts = useMemo(() => {
+    const counts: Record<TaskStatus, number> = { IN_PROGRESS: 0, DONE: 0, PAUSED: 0, OVERDUE: 0, CLOSED: 0 }
+    for (const task of tasks) counts[task.status]++
+    return counts
+  }, [tasks])
+
   const isManager = currentUser?.role === 'MANAGER'
 
   if (loading) return (
@@ -277,7 +283,7 @@ export default function Home() {
             Добрый день, <span className="font-semibold">{currentUser?.name?.split(' ')[0]}</span>.
           </h1>
           <p className="text-muted-foreground">
-            У вас <span className="text-foreground font-medium">{tasks.filter(t => t.status === 'IN_PROGRESS').length}</span> активных задач сегодня.
+            У вас <span className="text-foreground font-medium">{tabCounts.IN_PROGRESS}</span> активных задач сегодня.
           </p>
         </div>
 
@@ -298,7 +304,7 @@ export default function Home() {
                >
                  {tab.label}
                  <span className={`ml-2 text-[10px] py-0.5 px-1.5 rounded-full ${activeTab === tab.id ? 'bg-primary-foreground/20' : 'bg-secondary'}`}>
-                    {tasks.filter(t => t.status === tab.id).length}
+                    {tabCounts[tab.id]}
                  </span>
                </button>
              ))}
