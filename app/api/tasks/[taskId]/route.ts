@@ -504,6 +504,14 @@ export async function PATCH(
   }
 
   const updatedTask = await prisma.$transaction(async (tx) => {
+    const freshTask = await tx.task.findUnique({ where: { id: task.id }, select: { status: true } })
+    if (!freshTask) {
+      throw new Error('Task disappeared during update')
+    }
+    if (freshTask.status !== task.status) {
+      throw new Error('Task was modified by another request')
+    }
+
     let nextTeamSnapshot = teamHistoryBefore
     if (normalizedAssignments !== undefined) {
       if (normalizedAssignments.length === 0) {

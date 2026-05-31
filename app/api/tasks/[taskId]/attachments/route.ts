@@ -12,6 +12,21 @@ import { ensureStorageRoot, buildStoredFilePath, toRelativeStoragePath } from '@
 import { bot } from '@/lib/bot'
 
 const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024 // 2GB (Telegram limit)
+const ALLOWED_MIME_TYPES = new Set([
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif',
+  'application/pdf',
+  'text/plain', 'text/csv',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed',
+  'video/mp4', 'video/quicktime', 'video/x-msvideo',
+  'audio/mpeg', 'audio/ogg', 'audio/wav',
+])
+const MAX_MIME_TYPE_LENGTH = 200
 function sanitizeFileName(name: string) {
   return name.replaceAll(/[^a-zA-Z0-9_.-]+/g, '_')
 }
@@ -125,6 +140,11 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
 
     if (file.size > MAX_UPLOAD_BYTES) {
       return NextResponse.json({ error: 'File exceeds 2GB limit' }, { status: 413 })
+    }
+
+    const mimeType = file.type || ''
+    if (mimeType.length > MAX_MIME_TYPE_LENGTH || (mimeType && !ALLOWED_MIME_TYPES.has(mimeType))) {
+      return NextResponse.json({ error: 'File type not allowed' }, { status: 415 })
     }
 
     await ensureStorageRoot()

@@ -5,10 +5,15 @@ import { validateTelegramWebAppData } from '@/lib/auth'
 import { ensureTelegramUser, isWhitelistedTelegramId } from '@/lib/users'
 import { createDownloadToken } from '@/lib/download-tokens'
 
-function canAccessAttachment(task: { creatorId: bigint; assigneeId: bigint | null }, userId: bigint, role: 'EMPLOYEE' | 'MANAGER') {
+function canAccessAttachment(
+  task: { creatorId: bigint; assigneeId: bigint | null; assignments?: { userId: bigint }[] },
+  userId: bigint,
+  role: 'EMPLOYEE' | 'MANAGER'
+) {
   if (role === 'MANAGER') return true
   if (task.creatorId === userId) return true
   if (task.assigneeId && task.assigneeId === userId) return true
+  if (task.assignments?.some((a) => a.userId === userId)) return true
   return false
 }
 
@@ -50,6 +55,7 @@ export async function POST(request: Request, context: { params: Promise<{ attach
         select: {
           creatorId: true,
           assigneeId: true,
+          assignments: { select: { userId: true } },
         },
       },
     },
