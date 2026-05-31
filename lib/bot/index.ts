@@ -379,7 +379,7 @@ function extractRelativeDeadline(rawText: string): Date | null {
   if (monthMatch) {
     const day = Number(monthMatch[1])
     const monthName = monthMatch[2]
-    const month = MONTH_NAME_MAP[monthName as keyof typeof MONTH_NAME_MAP]
+    const month = MONTH_NAME_MAP[monthName]
     if (!Number.isNaN(day) && month) {
       const date = createDateWithMonthName(today, day, month)
       if (date) return date
@@ -552,10 +552,11 @@ function buildTaskSummaryMessage(task: TaskWithRelations): string {
     (task.assigneeId ? `ID ${task.assigneeId.toString()}` : 'Не назначена')
   const deadline = task.deadline ? formatDeadlineForDisplay(task.deadline) : '—'
   const teamDetails = task.assignments
-    ?.map(
-      (assignment) =>
-        `${assignment.isLead ? '⭐ ' : ''}${assignment.user?.name ?? `ID ${assignment.userId.toString()}`}`,
-    )
+    ?.map((assignment) => {
+      const lead = assignment.isLead ? '⭐ ' : ''
+      const name = assignment.user?.name ?? `ID ${assignment.userId.toString()}`
+      return `${lead}${name}`
+    })
     .join(', ')
   const tagDetails = task.tags?.map(({ tag }) => `#${tag.label}`).join(', ')
   const projectDetails = task.projects
