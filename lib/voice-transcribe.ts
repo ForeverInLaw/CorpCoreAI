@@ -22,7 +22,7 @@ let cachedClient: grpc.Client & {
 
 function loadRivaClient() {
   const protoDir = join(process.cwd(), 'proto')
-  const packageDef = protoLoader.loadSync('riva/proto/riva_asr.proto', {
+  const packageDef = protoLoader.loadSync('riva/riva_asr.proto', {
     keepCase: true,
     longs: String,
     enums: String,
