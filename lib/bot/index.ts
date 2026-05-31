@@ -750,12 +750,13 @@ async function handleTaskStatusChange(
 
   updates.status = nextStatus
   updates.statusChangedAt = now
-  updates.completedAt =
-    nextStatus === 'DONE'
-      ? now
-      : nextStatus === 'CLOSED'
-        ? (task.completedAt ?? now)
-        : null
+  let completedAt: Date | null = null
+  if (nextStatus === 'DONE') {
+    completedAt = now
+  } else if (nextStatus === 'CLOSED') {
+    completedAt = task.completedAt ?? now
+  }
+  updates.completedAt = completedAt
   historyEntries.push({
     type: 'STATUS_CHANGE',
     details: {
@@ -923,22 +924,23 @@ async function handleReviewAction(
     updates.completionReviewedBy = { connect: { id: ctx.user.id } }
   }
 
-  historyEntries.push({
-    type: 'STATUS_CHANGE',
-    details: {
-      from: previousStatus,
-      to: resultingStatus,
+  historyEntries.push(
+    {
+      type: 'STATUS_CHANGE',
+      details: {
+        from: previousStatus,
+        to: resultingStatus,
+      },
     },
-  })
-
-  historyEntries.push({
-    type: 'REVIEW_STATUS_CHANGE',
-    details: {
-      from: previousReviewStatus,
-      to: updates.completionReviewStatus,
-      reason: action,
+    {
+      type: 'REVIEW_STATUS_CHANGE',
+      details: {
+        from: previousReviewStatus,
+        to: updates.completionReviewStatus,
+        reason: action,
+      },
     },
-  })
+  )
 
   const updated = await prisma.task.update({
     where: { id: task.id },
