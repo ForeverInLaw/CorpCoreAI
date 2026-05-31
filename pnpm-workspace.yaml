@@ -1,0 +1,12 @@
+overrides:
+  baseline-browser-mapping: 2.10.32
+  picomatch: 4.0.4
+  'ip-address': 10.1.1
+  'brace-expansion': 2.0.3
+
+allowBuilds:
+  '@prisma/engines': true
+  prisma: true
+  esbuild: false
+  sharp: false
+  unrs-resolver: false
