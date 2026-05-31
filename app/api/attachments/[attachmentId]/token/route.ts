@@ -39,12 +39,12 @@ export async function POST(request: Request, context: { params: Promise<{ attach
     return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 })
   }
 
-  if (!isWhitelistedTelegramId(userId)) {
+  if (!isWhitelistedTelegramId(String(userId))) {
     return NextResponse.json({ error: 'Access denied' }, { status: 403 })
   }
 
   const telegramUser = await ensureTelegramUser({
-    id: userId,
+    id: String(userId),
     name: userPayload.user?.first_name,
   })
 

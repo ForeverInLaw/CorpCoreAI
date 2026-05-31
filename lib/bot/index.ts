@@ -1245,7 +1245,7 @@ bot.use(async (ctx, next) => {
 
     if (user) {
         user = await ensureTelegramUser({
-            id: userId,
+            id: String(userId),
             name: ctx.from?.first_name,
         })
     } else {
@@ -1255,7 +1255,7 @@ bot.use(async (ctx, next) => {
         }
 
         user = await ensureTelegramUser({
-            id: userId,
+            id: String(userId),
             name: ctx.from?.first_name,
         })
     }

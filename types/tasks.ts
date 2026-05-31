@@ -87,6 +87,7 @@ export interface EmployeeOption {
 
 export interface TasksResponse {
   tasks: Task[]
+  nextCursor: string | null
   user: UserPayload
   employees: EmployeeOption[]
   availableTags?: TagOption[]

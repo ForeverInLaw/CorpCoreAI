@@ -1,10 +1,13 @@
-import { NextResponse } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 
 import { prisma } from '@/lib/db'
 import { validateTelegramWebAppData } from '@/lib/auth'
 import { ensureTelegramUser, isWhitelistedTelegramId } from '@/lib/users'
 
-export async function GET(request: Request) {
+const DEFAULT_PAGE_SIZE = 50
+const MAX_PAGE_SIZE = 100
+
+export async function GET(request: NextRequest) {
     const initData = request.headers.get('Authorization')
 
     if (!initData) {
@@ -23,13 +26,20 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'User ID missing in initData' }, { status: 400 })
     }
 
-    if (!isWhitelistedTelegramId(userId)) {
+    if (!isWhitelistedTelegramId(String(userId))) {
         return NextResponse.json({ error: 'Access denied' }, { status: 403 })
     }
 
+    const cursor = request.nextUrl.searchParams.get('cursor')
+    const limitParam = request.nextUrl.searchParams.get('limit')
+    const limit = Math.min(
+        Math.max(parseInt(limitParam ?? String(DEFAULT_PAGE_SIZE), 10) || DEFAULT_PAGE_SIZE, 1),
+        MAX_PAGE_SIZE
+    )
+
     try {
         const telegramUser = await ensureTelegramUser({
-            id: userId,
+            id: String(userId),
             name: user.user?.first_name,
         })
 
@@ -89,8 +99,18 @@ export async function GET(request: Request) {
                 },
                 completionReviewedBy: true,
             },
-            orderBy: { createdAt: 'desc' }
+            orderBy: { createdAt: 'desc' },
+            take: limit + 1,
+            ...(cursor
+                ? {
+                    cursor: { id: Number(cursor) },
+                    skip: 1,
+                }
+                : {}),
         })
+
+        const hasMore = tasks.length > limit
+        const nextCursor = hasMore ? tasks[tasks.length - 1].id.toString() : null
 
         const serializedTasks = tasks.map((task) => ({
             id: task.id.toString(),
@@ -169,6 +189,7 @@ export async function GET(request: Request) {
 
         return NextResponse.json({
             tasks: serializedTasks,
+            nextCursor,
             user: {
                 id: telegramUser.id.toString(),
                 role: telegramUser.role,

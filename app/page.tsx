@@ -39,6 +39,8 @@ import type {
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TaskStatus>('IN_PROGRESS')
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [currentUser, setCurrentUser] = useState<UserPayload | null>(null)
@@ -92,12 +94,14 @@ export default function Home() {
     }
   }, [])
 
-  const fetchTasks = async (initData: string) => {
+  const fetchTasks = async (initData: string, cursor?: string) => {
     setFetchError(null)
-    setLoading(true)
+    if (!cursor) setLoading(true)
+    else setLoadingMore(true)
     telegramInitDataRef.current = initData
     try {
-      const res = await fetch(`/api/tasks`, {
+      const url = cursor ? `/api/tasks?cursor=${cursor}` : '/api/tasks'
+      const res = await fetch(url, {
         headers: { 'Authorization': initData }
       })
       if (res.status === 403) {
@@ -108,29 +112,35 @@ export default function Home() {
       } else if (res.ok) {
         setAccessDenied(false)
         const data: TasksResponse = await res.json()
-        setTasks(data.tasks)
-        setCurrentUser(data.user)
-        setEmployees(data.employees ?? [])
-        setAvailableTags(data.availableTags ?? [])
-        setAvailableProjects(data.availableProjects ?? [])
-        
-        // Initialize Drafts
-        const dDrafts: Record<string, string> = {}
-        const tDrafts: Record<string, TaskAssignmentMember[]> = {}
-        const tagDraftsInit: Record<string, number[]> = {}
-        const projDraftsInit: Record<string, number[]> = {}
-        
+
+        if (cursor) {
+          setTasks((prev) => [...prev, ...data.tasks])
+        } else {
+          setTasks(data.tasks)
+          setCurrentUser(data.user)
+          setEmployees(data.employees ?? [])
+          setAvailableTags(data.availableTags ?? [])
+          setAvailableProjects(data.availableProjects ?? [])
+        }
+        setNextCursor(data.nextCursor)
+
+        // Initialize Drafts for new tasks
+        const dDraftsUpdate: Record<string, string> = {}
+        const tDraftsUpdate: Record<string, TaskAssignmentMember[]> = {}
+        const tagDraftsUpdate: Record<string, number[]> = {}
+        const projDraftsUpdate: Record<string, number[]> = {}
+
         data.tasks.forEach((task) => {
-          dDrafts[task.id] = task.deadline ? task.deadline.slice(0, 10) : ''
-          tDrafts[task.id] = (task.assignments ?? []).map((member) => ({ ...member }))
-          tagDraftsInit[task.id] = (task.tags ?? []).map((tag) => tag.id)
-          projDraftsInit[task.id] = (task.projects ?? []).map((project) => project.id)
+          dDraftsUpdate[task.id] = task.deadline ? task.deadline.slice(0, 10) : ''
+          tDraftsUpdate[task.id] = (task.assignments ?? []).map((member) => ({ ...member }))
+          tagDraftsUpdate[task.id] = (task.tags ?? []).map((tag) => tag.id)
+          projDraftsUpdate[task.id] = (task.projects ?? []).map((project) => project.id)
         })
-        
-        setDeadlineDrafts(dDrafts)
-        setTeamDrafts(tDrafts)
-        setTagDrafts(tagDraftsInit)
-        setProjectDrafts(projDraftsInit)
+
+        setDeadlineDrafts((prev) => ({ ...prev, ...dDraftsUpdate }))
+        setTeamDrafts((prev) => ({ ...prev, ...tDraftsUpdate }))
+        setTagDrafts((prev) => ({ ...prev, ...tagDraftsUpdate }))
+        setProjectDrafts((prev) => ({ ...prev, ...projDraftsUpdate }))
       } else {
         setFetchError('Не удалось загрузить задачи')
       }
@@ -139,6 +149,7 @@ export default function Home() {
       setFetchError('Ошибка соединения')
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
   }
 
@@ -427,7 +438,7 @@ export default function Home() {
                 tagError={tagErrors[task.id]}
                 projectError={projectErrors[task.id]}
                 uploadError={uploadErrors[task.id]}
-                downloadError={downloadErrors[task.id]} // Map this properly if needed, currently using single ID logic in parent but map in Card would be better.
+                downloadError={downloadErrors[task.id]}
                 downloadingAttachmentId={downloadingAttachmentId}
                 uploadingTaskId={uploadingTaskId}
 
@@ -464,6 +475,26 @@ export default function Home() {
             ))
           )}
         </div>
+
+        {/* Load More */}
+        {nextCursor && !loading && (
+          <div className="flex justify-center pt-4">
+            <Button
+              variant="outline"
+              onClick={() => fetchTasks(telegramInitDataRef.current!, nextCursor!)}
+              disabled={loadingMore}
+            >
+              {loadingMore ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent mr-2" />
+                  Загрузка...
+                </>
+              ) : (
+                'Загрузить ещё'
+              )}
+            </Button>
+          </div>
+        )}
       </main>
     </div>
   )
