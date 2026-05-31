@@ -97,10 +97,10 @@ export interface ServiceResult {
 }
 
 export class TaskUpdateService {
-  private updates: Prisma.TaskUpdateInput = {}
+  private readonly updates: Prisma.TaskUpdateInput = {}
   private nextStatus?: TaskStatus
   private notifyAssigneeId: bigint | null = null
-  private historyEntries: HistoryEntry[] = []
+  private readonly historyEntries: HistoryEntry[] = []
   private normalizedAssignments?: NormalizedAssignment[]
   private normalizedTagIds?: number[]
   private normalizedProjectIds?: number[]
@@ -245,7 +245,7 @@ export class TaskUpdateService {
     }
 
     const parsed = raw
-      .map((v) => Number(v))
+      .map(Number)
       .filter((v) => Number.isInteger(v) && v > 0)
     if (parsed.length !== raw.length) {
       throw new ServiceError('All tagIds must be positive integers')
@@ -275,7 +275,7 @@ export class TaskUpdateService {
     }
 
     const parsed = raw
-      .map((v) => Number(v))
+      .map(Number)
       .filter((v) => Number.isInteger(v) && v > 0)
     if (parsed.length !== raw.length) {
       throw new ServiceError('All projectIds must be positive integers')
@@ -434,13 +434,15 @@ export class TaskUpdateService {
     if (this.nextStatus !== this.task.status) {
       this.updates.status = this.nextStatus
       this.updates.statusChangedAt = this.now
-      this.updates.completedAt =
-        this.nextStatus === TaskStatus.DONE
-          ? this.now
-          : (this.updates.completedAt ??
-            (this.nextStatus === TaskStatus.CLOSED
-              ? this.task.completedAt
-              : null))
+      let completedAt: Date | null = null
+      if (this.nextStatus === TaskStatus.DONE) {
+        completedAt = this.now
+      } else if (this.updates.completedAt != null) {
+        completedAt = this.updates.completedAt
+      } else if (this.nextStatus === TaskStatus.CLOSED) {
+        completedAt = this.task.completedAt
+      }
+      this.updates.completedAt = completedAt
       this.historyEntries.push({
         type: 'STATUS_CHANGE',
         details: { from: this.task.status, to: this.nextStatus },
