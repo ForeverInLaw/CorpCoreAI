@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useCallback } from 'react'
 import { 
   IconSearch, 
   IconRefresh, 
@@ -20,44 +20,23 @@ import {
 } from "@/components/ui/select"
 import { TaskCard } from '@/components/TaskCard'
 
+import { useAuthStore } from '@/stores/auth'
+import { useTasksStore } from '@/stores/tasks'
+import { useFiltersStore } from '@/stores/filters'
+import { useUiStore } from '@/stores/ui'
+
 import type { 
-  Task, 
   TaskStatus, 
-  UserPayload, 
-  EmployeeOption, 
-  TaskAssignmentMember, 
   Attachment,
   TasksResponse
 } from '@/types/tasks'
 
 export default function Home() {
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [nextCursor, setNextCursor] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<TaskStatus>('IN_PROGRESS')
-  const [isAuthorized, setIsAuthorized] = useState(false)
-  const [currentUser, setCurrentUser] = useState<UserPayload | null>(null)
-  const [employees, setEmployees] = useState<EmployeeOption[]>([])
-  
-  // Filters
-  const [selectedAssignee, setSelectedAssignee] = useState<string>('all')
-  const [searchQuery, setSearchQuery] = useState('')
+  const { isAuthorized, currentUser, accessDenied, setAuthorized, setCurrentUser, setAccessDenied } = useAuthStore()
+  const { tasks, loading, loadingMore, nextCursor, employees, setTasks, appendTasks, setLoading, setLoadingMore, setNextCursor, setEmployees } = useTasksStore()
+  const { activeTab, selectedAssignee, searchQuery, setActiveTab, setSelectedAssignee, setSearchQuery } = useFiltersStore()
+  const ui = useUiStore()
 
-  // Errors & Status
-  const [accessDenied, setAccessDenied] = useState(false)
-  
-  // Drafts & Ops State
-  const [uploadingTaskId, setUploadingTaskId] = useState<string | null>(null)
-  const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({})
-  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null)
-  const [, setDownloadErrors] = useState<Record<string, string>>({})
-  const [deadlineDrafts, setDeadlineDrafts] = useState<Record<string, string>>({})
-  const [updatingTasks, setUpdatingTasks] = useState<Record<string, boolean>>({})
-  const [updateErrors, setUpdateErrors] = useState<Record<string, string>>({})
-  const [teamDrafts, setTeamDrafts] = useState<Record<string, TaskAssignmentMember[]>>({})
-  const [teamErrors, setTeamErrors] = useState<Record<string, string>>({})
-  
   const telegramInitDataRef = useRef<string | null>(null)
 
   const fetchTasks = useCallback(async (initData: string, cursor?: string) => {
@@ -79,7 +58,7 @@ export default function Home() {
         const data: TasksResponse = await res.json()
 
         if (cursor) {
-          setTasks((prev) => [...prev, ...data.tasks])
+          appendTasks(data.tasks)
         } else {
           setTasks(data.tasks)
           setCurrentUser(data.user)
@@ -87,19 +66,7 @@ export default function Home() {
         }
         setNextCursor(data.nextCursor)
 
-        // Initialize Drafts for new tasks
-        const dDraftsUpdate: Record<string, string> = {}
-        const tDraftsUpdate: Record<string, TaskAssignmentMember[]> = {}
-
-        data.tasks.forEach((task) => {
-          dDraftsUpdate[task.id] = task.deadline ? task.deadline.slice(0, 10) : ''
-          tDraftsUpdate[task.id] = (task.assignments ?? []).map((member) => ({ ...member }))
-        })
-
-        setDeadlineDrafts((prev) => ({ ...prev, ...dDraftsUpdate }))
-        setTeamDrafts((prev) => ({ ...prev, ...tDraftsUpdate }))
-      } else {
-        // Non-OK response
+        ui.initDrafts(data.tasks)
       }
     } catch (error) {
       console.error(error)
@@ -107,10 +74,9 @@ export default function Home() {
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [])
+  }, [setTasks, appendTasks, setLoading, setLoadingMore, setNextCursor, setCurrentUser, setEmployees, setAccessDenied, ui])
 
   useEffect(() => {
-    // Strict production check: Must be inside Telegram WebApp
     if (globalThis.window !== undefined && (globalThis.window as { Telegram?: { WebApp?: unknown } }).Telegram?.WebApp) {
       const tg = (globalThis.window as unknown as { Telegram: { WebApp: { ready: () => void; expand: () => void; initData: string } } }).Telegram.WebApp
       tg.ready()
@@ -118,7 +84,7 @@ export default function Home() {
 
       const initData = tg.initData
       if (initData) {
-        setIsAuthorized(true)
+        setAuthorized(true)
         fetchTasks(initData)
       } else {
         setLoading(false)
@@ -126,9 +92,7 @@ export default function Home() {
     } else {
       setLoading(false)
     }
-  }, [fetchTasks])
-
-  // --- Handlers (Refactored for props) ---
+  }, [fetchTasks, setAuthorized, setLoading])
 
   type TaskUpdatePayload = {
     status?: TaskStatus
@@ -142,8 +106,8 @@ export default function Home() {
 
   const handleTaskUpdate = useCallback(async (taskId: string, payload: TaskUpdatePayload) => {
     if (!telegramInitDataRef.current) return
-    setUpdatingTasks((prev) => ({ ...prev, [taskId]: true }))
-    setUpdateErrors((prev) => ({ ...prev, [taskId]: '' }))
+    ui.setUpdating(taskId, true)
+    ui.setUpdateError(taskId, '')
 
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
@@ -163,18 +127,16 @@ export default function Home() {
       await fetchTasks(telegramInitDataRef.current)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to update task'
-      setUpdateErrors((prev) => ({ ...prev, [taskId]: message }))
+      ui.setUpdateError(taskId, message)
     } finally {
-      setUpdatingTasks((prev) => ({ ...prev, [taskId]: false }))
+      ui.setUpdating(taskId, false)
     }
-  }, [fetchTasks])
-
-  // ... (Simplified wrappers for TaskCard) ...
+  }, [fetchTasks, ui])
 
   const handleFileUpload = useCallback(async (taskId: string, file: File) => {
     if (!telegramInitDataRef.current) return
-    setUploadingTaskId(taskId)
-    setUploadErrors((prev) => ({ ...prev, [taskId]: '' }))
+    ui.setUploadingTaskId(taskId)
+    ui.setUploadError(taskId, '')
 
     try {
       const formData = new FormData()
@@ -189,11 +151,11 @@ export default function Home() {
       if (!response.ok) throw new Error('Upload failed')
       await fetchTasks(telegramInitDataRef.current)
     } catch {
-      setUploadErrors((prev) => ({ ...prev, [taskId]: 'Ошибка загрузки' }))
+      ui.setUploadError(taskId, 'Ошибка загрузки')
     } finally {
-      setUploadingTaskId(null)
+      ui.setUploadingTaskId(null)
     }
-  }, [fetchTasks])
+  }, [fetchTasks, ui])
 
   const requestDownloadUrl = useCallback(async (attachmentId: string) => {
     if (!telegramInitDataRef.current) throw new Error('Auth missing')
@@ -208,34 +170,29 @@ export default function Home() {
 
   const handleFileDownload = useCallback(async (attachment: Attachment) => {
     try {
-      setDownloadingAttachmentId(attachment.id)
+      ui.setDownloadingAttachmentId(attachment.id)
       const url = await requestDownloadUrl(attachment.id)
       window.open(url, '_blank')
     } catch {
-      setDownloadErrors(prev => ({...prev, [attachment.id]: 'Ошибка скачивания'}))
+      // noop — download error state removed (dead state)
     } finally {
-      setDownloadingAttachmentId(null)
+      ui.setDownloadingAttachmentId(null)
     }
-  }, [requestDownloadUrl])
+  }, [requestDownloadUrl, ui])
 
-  // --- Team Logic (Ported) ---
-  const updateTeamDraft = useCallback((taskId: string, updater: (current: TaskAssignmentMember[]) => TaskAssignmentMember[]) => {
-    setTeamDrafts((prev) => ({ ...prev, [taskId]: updater(prev[taskId] ?? []) }))
-  }, [])
-  
   const handleTeamAddMember = useCallback((taskId: string, userId: string) => {
-     const emp = employees.find(e => e.id === userId); if(!emp) return;
-     updateTeamDraft(taskId, curr => curr.some(m => m.userId === userId) ? curr : [...curr, { userId, name: emp.name, isLead: curr.length === 0 }])
-  }, [employees, updateTeamDraft])
-  
-  const handleTeamSave = useCallback(async (taskId: string) => {
-    const draft = teamDrafts[taskId] ?? []
-    if (draft.length === 0) return setTeamErrors(p => ({...p, [taskId]: 'Нужен хотя бы 1 участник'}))
-    if (!draft.some(m => m.isLead)) return setTeamErrors(p => ({...p, [taskId]: 'Выберите лидера'}))
-    await handleTaskUpdate(taskId, { assignments: draft.map(m => ({ userId: m.userId, isLead: m.isLead })) })
-  }, [teamDrafts, handleTaskUpdate])
+    const emp = employees.find(e => e.id === userId)
+    if (!emp) return
+    ui.updateTeamDraft(taskId, curr => curr.some(m => m.userId === userId) ? curr : [...curr, { userId, name: emp.name, isLead: curr.length === 0 }])
+  }, [employees, ui])
 
-  // --- Filter Logic ---
+  const handleTeamSave = useCallback(async (taskId: string) => {
+    const draft = useUiStore.getState().teamDrafts[taskId] ?? []
+    if (draft.length === 0) return ui.setTeamError(taskId, 'Нужен хотя бы 1 участник')
+    if (!draft.some(m => m.isLead)) return ui.setTeamError(taskId, 'Выберите лидера')
+    await handleTaskUpdate(taskId, { assignments: draft.map(m => ({ userId: m.userId, isLead: m.isLead })) })
+  }, [handleTaskUpdate, ui])
+
   const filteredTasks = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase()
     return tasks.filter((task) => {
@@ -249,8 +206,6 @@ export default function Home() {
   }, [tasks, activeTab, selectedAssignee, searchQuery])
 
   const isManager = currentUser?.role === 'MANAGER'
-
-  // --- Render ---
 
   if (loading) return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background gap-4">
@@ -397,31 +352,28 @@ export default function Home() {
                 employees={employees}
                 isManager={isManager}
                 
-                // State Props
-                teamDraft={teamDrafts[task.id] ?? []}
-                deadlineDraft={deadlineDrafts[task.id] ?? ''}
+                teamDraft={ui.teamDrafts[task.id] ?? []}
+                deadlineDraft={ui.deadlineDrafts[task.id] ?? ''}
                 
-                // Status
-                isUpdating={!!updatingTasks[task.id]}
-                updateError={updateErrors[task.id]}
-                teamError={teamErrors[task.id]}
-                uploadError={uploadErrors[task.id]}
-                downloadingAttachmentId={downloadingAttachmentId}
-                uploadingTaskId={uploadingTaskId}
+                isUpdating={!!ui.updatingTasks[task.id]}
+                updateError={ui.updateErrors[task.id]}
+                teamError={ui.teamErrors[task.id]}
+                uploadError={ui.uploadErrors[task.id]}
+                downloadingAttachmentId={ui.downloadingAttachmentId}
+                uploadingTaskId={ui.uploadingTaskId}
 
-                // Handlers
                 onStatusChange={(s) => handleTaskUpdate(task.id, { status: s })}
-                onDeadlineChange={(v) => setDeadlineDrafts(p => ({...p, [task.id]: v}))}
+                onDeadlineChange={(v) => ui.setDeadlineDraft(task.id, v)}
                 onDeadlineSave={async () => {
-                   const d = deadlineDrafts[task.id]; 
+                   const d = ui.deadlineDrafts[task.id]
                    await handleTaskUpdate(task.id, { deadline: d ? `${d}T00:00:00.000Z` : null })
                 }}
                 onAssigneeChange={(id) => handleTaskUpdate(task.id, { assigneeId: id === 'unassigned' ? null : id })}
                 
-                onTeamReset={() => setTeamDrafts(p => ({...p, [task.id]: (task.assignments ?? []).map(m => ({...m}))}))}
+                onTeamReset={() => ui.setTeamDraft(task.id, (task.assignments ?? []).map(m => ({...m})))}
                 onTeamSave={() => handleTeamSave(task.id)}
                 onTeamAddMember={(uid) => handleTeamAddMember(task.id, uid)}
-                onTeamRemoveMember={(uid) => updateTeamDraft(task.id, curr => curr.filter(m => m.userId !== uid))}
+                onTeamRemoveMember={(uid) => ui.updateTeamDraft(task.id, curr => curr.filter(m => m.userId !== uid))}
                 
                 onReviewAction={(action) => handleTaskUpdate(task.id, { reviewAction: action })}
                 onFileUpload={(f) => handleFileUpload(task.id, f)}
