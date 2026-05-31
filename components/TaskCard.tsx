@@ -2,16 +2,16 @@
 
 import { useState, useRef } from 'react'
 import { 
-  Clock, 
-  MoreVertical, 
-  Paperclip, 
-  User, 
-  CheckCircle2, 
-  AlertCircle,
-  FileText,
-  Shield,
-  X
-} from 'lucide-react'
+  IconClock, 
+  IconDotsVertical, 
+  IconPaperclip, 
+  IconUser, 
+  IconCircleCheck, 
+  IconAlertCircle,
+  IconFileText,
+  IconShield,
+  IconX
+} from '@tabler/icons-react'
 
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -82,12 +82,12 @@ interface TaskCardProps {
   onFileDownload: (attachment: Attachment) => void
 }
 
-const STATUS_CONFIG: Record<TaskStatus, { label: string; color: string; icon: typeof Clock }> = {
-  IN_PROGRESS: { label: 'In Progress', color: 'bg-blue-500/10 text-blue-600 border-blue-200', icon: Clock },
-  DONE: { label: 'Done', color: 'bg-emerald-500/10 text-emerald-600 border-emerald-200', icon: CheckCircle2 },
-  PAUSED: { label: 'Paused', color: 'bg-amber-500/10 text-amber-600 border-amber-200', icon: AlertCircle },
-  OVERDUE: { label: 'Overdue', color: 'bg-red-500/10 text-red-600 border-red-200', icon: AlertCircle },
-  CLOSED: { label: 'Closed', color: 'bg-slate-100 text-slate-500 border-slate-200', icon: X },
+const STATUS_CONFIG: Record<TaskStatus, { label: string; color: string; icon: typeof IconClock }> = {
+  IN_PROGRESS: { label: 'In Progress', color: 'bg-blue-500/10 text-blue-600 border-blue-200', icon: IconClock },
+  DONE: { label: 'Done', color: 'bg-emerald-500/10 text-emerald-600 border-emerald-200', icon: IconCircleCheck },
+  PAUSED: { label: 'Paused', color: 'bg-amber-500/10 text-amber-600 border-amber-200', icon: IconAlertCircle },
+  OVERDUE: { label: 'Overdue', color: 'bg-red-500/10 text-red-600 border-red-200', icon: IconAlertCircle },
+  CLOSED: { label: 'Closed', color: 'bg-slate-100 text-slate-500 border-slate-200', icon: IconX },
 }
 
 export function TaskCard({
@@ -157,7 +157,7 @@ export function TaskCard({
                     ? "text-destructive" 
                     : "text-muted-foreground"
                 )}>
-                  {new Date(task.deadline) < new Date() && task.status !== 'DONE' && <AlertCircle className="h-3 w-3" />}
+                  {new Date(task.deadline) < new Date() && task.status !== 'DONE' && <IconAlertCircle className="h-3 w-3" />}
                   {new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' }).format(new Date(task.deadline))}
                 </span>
               )}
@@ -170,7 +170,7 @@ export function TaskCard({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-                <MoreVertical className="h-4 w-4" />
+                <IconDotsVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
@@ -194,7 +194,7 @@ export function TaskCard({
         {task.overdueReason && (
           <div className="rounded-md bg-destructive/10 p-2.5 text-xs text-destructive border border-destructive/20">
             <div className="flex items-center gap-1.5 font-medium mb-1">
-               <AlertCircle className="h-3.5 w-3.5" />
+               <IconAlertCircle className="h-3.5 w-3.5" />
                Причина просрочки
             </div>
             <p className="opacity-90 leading-relaxed">{task.overdueReason}</p>
@@ -245,10 +245,10 @@ export function TaskCard({
                   {isManager && (
                      <div className="flex items-center gap-1">
                         <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onTeamReset} disabled={isUpdating}>
-                          <X className="h-3 w-3" />
+                          <IconX className="h-3 w-3" />
                         </Button>
                         <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onTeamSave} disabled={isUpdating}>
-                          <CheckCircle2 className="h-3 w-3" />
+                          <IconCircleCheck className="h-3 w-3" />
                         </Button>
                      </div>
                   )}
@@ -265,10 +265,10 @@ export function TaskCard({
                           variant={member.isLead ? 'default' : 'secondary'}
                           className="pl-1 pr-2 py-1 flex items-center gap-1 hover:bg-primary/20"
                         >
-                          {member.isLead && <Shield className="h-3 w-3" />}
+                          {member.isLead && <IconShield className="h-3 w-3" />}
                           <span className="text-xs">{member.name}</span>
                           {isManager && (
-                            <X 
+                            <IconX 
                               className="h-3 w-3 ml-1 cursor-pointer opacity-50 hover:opacity-100" 
                               onClick={() => onTeamRemoveMember(member.userId)}
                             />
@@ -323,7 +323,7 @@ export function TaskCard({
                           value={deadlineDraft ?? ''} 
                           onChange={(e) => onDeadlineChange(e.target.value)}
                         />
-                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={onDeadlineSave}><CheckCircle2 className="h-4 w-4" /></Button>
+                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={onDeadlineSave}><IconCircleCheck className="h-4 w-4" /></Button>
                       </div>
                     </div>
 
@@ -391,7 +391,7 @@ export function TaskCard({
                     <div key={att.id} className="flex items-center justify-between p-2 bg-background border rounded-md text-sm hover:bg-accent/50 transition-colors">
                       <div className="flex items-center gap-2 overflow-hidden">
                         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                          <FileText className="h-4 w-4 text-primary" />
+                          <IconFileText className="h-4 w-4 text-primary" />
                         </div>
                         <div className="flex flex-col min-w-0">
                           <span className="truncate font-medium text-xs">{att.fileName || 'Файл'}</span>
@@ -405,7 +405,7 @@ export function TaskCard({
                         onClick={() => onFileDownload(att)}
                         disabled={downloadingAttachmentId === att.id}
                       >
-                        <Paperclip className="h-3.5 w-3.5" />
+                        <IconPaperclip className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   ))}
@@ -434,12 +434,12 @@ export function TaskCard({
          <CardFooter className="px-5 py-3 bg-muted/10 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
             <div className="flex items-center gap-3">
                <div className="flex items-center gap-1.5">
-                  <User className="h-3.5 w-3.5" />
+                  <IconUser className="h-3.5 w-3.5" />
                   <span>{task.assigneeName || 'Не назначен'}</span>
                </div>
                {task.attachments && task.attachments.length > 0 && (
                  <div className="flex items-center gap-1.5">
-                   <Paperclip className="h-3.5 w-3.5" />
+                   <IconPaperclip className="h-3.5 w-3.5" />
                    <span>{task.attachments.length}</span>
                  </div>
                )}

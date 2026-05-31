@@ -43,3 +43,6 @@ TODO.md
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+AGENTS.md
+.continuum

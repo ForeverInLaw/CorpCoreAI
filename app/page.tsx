@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { 
-  Search, 
-  RefreshCw, 
-  Briefcase,
-  LogOut,
-  User as UserIcon
-} from 'lucide-react'
+  IconSearch, 
+  IconRefresh, 
+  IconBriefcase,
+  IconLogout,
+  IconUser as UserIcon
+} from '@tabler/icons-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -263,7 +263,7 @@ export default function Home() {
     <div className="flex items-center justify-center min-h-screen bg-background p-6">
       <div className="text-center space-y-4 max-w-sm">
          <div className="h-12 w-12 bg-destructive/10 text-destructive rounded-full flex items-center justify-center mx-auto">
-            <LogOut className="h-6 w-6" />
+            <IconLogout className="h-6 w-6" />
          </div>
          <h2 className="text-xl font-bold">Доступ ограничен</h2>
          <p className="text-muted-foreground text-sm">
@@ -308,7 +308,7 @@ export default function Home() {
                  </div>
               )}
               <Button variant="ghost" size="icon" onClick={() => fetchTasks(telegramInitDataRef.current!)}>
-                 <RefreshCw className="h-4 w-4" />
+                 <IconRefresh className="h-4 w-4" />
               </Button>
            </div>
         </div>
@@ -352,7 +352,7 @@ export default function Home() {
            {/* Filters */}
            <div className="flex gap-2 w-full lg:w-auto">
               <div className="relative flex-1 lg:w-64">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <IconSearch className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input 
                   placeholder="Поиск..." 
                   className="pl-9 bg-secondary/30 border-transparent focus:bg-background transition-all"
@@ -385,7 +385,7 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredTasks.length === 0 ? (
              <div className="col-span-full flex flex-col items-center justify-center py-12 text-center space-y-4 opacity-50">
-                <Briefcase className="h-12 w-12 stroke-[1px]" />
+                <IconBriefcase className="h-12 w-12" strokeWidth={1} />
                 <p>Задач не найдено</p>
              </div>
           ) : (

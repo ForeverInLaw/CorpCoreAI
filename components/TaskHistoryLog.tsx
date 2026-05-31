@@ -3,30 +3,29 @@ import {
   type TaskHistoryType,
 } from '@/types/tasks'
 import { 
-  Activity,
-  CalendarDays,
-  CheckCircle2,
-  User, 
-  Users, 
-  FileEdit,
-  Tag,
-  Briefcase
-} from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+  IconActivity,
+  IconCalendar,
+  IconCircleCheck,
+  IconUser, 
+  IconUsers, 
+  IconPencil,
+  IconTag,
+  IconBriefcase
+} from '@tabler/icons-react'
 
 interface TaskHistoryLogProps {
   history: TaskHistoryEntry[]
 }
 
-const HISTORY_ICONS: Record<TaskHistoryType, LucideIcon> = {
-  STATUS_CHANGE: CheckCircle2,
-  DEADLINE_CHANGE: CalendarDays,
-  ASSIGNEE_CHANGE: User,
-  OVERDUE_REASON: FileEdit,
-  TEAM_CHANGE: Users,
-  TAG_CHANGE: Tag,
-  PROJECT_CHANGE: Briefcase,
-  REVIEW_STATUS_CHANGE: Activity,
+const HISTORY_ICONS: Record<TaskHistoryType, typeof IconActivity> = {
+  STATUS_CHANGE: IconCircleCheck,
+  DEADLINE_CHANGE: IconCalendar,
+  ASSIGNEE_CHANGE: IconUser,
+  OVERDUE_REASON: IconPencil,
+  TEAM_CHANGE: IconUsers,
+  TAG_CHANGE: IconTag,
+  PROJECT_CHANGE: IconBriefcase,
+  REVIEW_STATUS_CHANGE: IconActivity,
 }
 
 const HISTORY_LABELS: Record<TaskHistoryType, string> = {
@@ -104,7 +103,7 @@ export function TaskHistoryLog({ history }: TaskHistoryLogProps) {
       <div className="max-h-[200px] w-full overflow-y-auto rounded-md border bg-muted/20 p-3">
         <div className="space-y-4">
           {history.map((entry) => {
-            const Icon = HISTORY_ICONS[entry.type] || Activity
+            const Icon = HISTORY_ICONS[entry.type] || IconActivity
             return (
               <div key={entry.id} className="relative pl-4 pb-1 border-l border-border last:border-0 last:pb-0">
                 <div className="absolute -left-[5px] top-0 h-2.5 w-2.5 rounded-full bg-background border border-primary" />
