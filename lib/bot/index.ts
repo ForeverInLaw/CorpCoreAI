@@ -369,7 +369,7 @@ function extractRelativeDeadline(rawText: string): Date | null {
   if (weekdayMatch) {
     const weekdayRaw = weekdayMatch[1]
     const weekdayIndex =
-      WEEKDAY_NAME_MAP[weekdayRaw as keyof typeof WEEKDAY_NAME_MAP]
+      WEEKDAY_NAME_MAP[weekdayRaw]
     if (weekdayIndex !== undefined) {
       return getUpcomingWeekday(today, weekdayIndex)
     }
