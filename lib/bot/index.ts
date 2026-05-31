@@ -17,7 +17,7 @@ if (!process.env.BOT_TOKEN) {
 }
 
 function parseIsoDeadline(deadlineIso: string): Date | null {
-  const match = deadlineIso.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(deadlineIso)
   if (!match) {
     return null
   }
@@ -173,7 +173,6 @@ const ATTACHMENT_INSTRUCTIONS =
   'Пришлите документ или изображение — я привяжу его к задаче.'
 const TASK_EMPTY_MESSAGE =
   'У вас пока нет задач, к которым можно прикрепить файл.'
-// TODO: check if used
 const MONTH_NAME_MAP: Record<string, number> = {
   января: 1,
   январь: 1,
@@ -238,7 +237,7 @@ const WEEKDAY_NAME_MAP: Record<string, number> = {
 }
 
 function escapeMarkdown(text: string): string {
-  return text.replace(/([_*`\[])/g, '\\$1')
+  return text.replace(/([_*`[])/g, String.raw`\$1`)
 }
 
 function formatDeadlineForDisplay(date: Date): string {
@@ -270,7 +269,7 @@ function ensureFutureOrToday(date: Date): Date | null {
 }
 
 function extractDeadlineFromText(text: string): Date | null {
-  const isoMatch = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/)
+  const isoMatch = RegExp(/\b(\d{4})-(\d{2})-(\d{2})\b/).exec(text)
   if (isoMatch) {
     const [, yearRaw, monthRaw, dayRaw] = isoMatch
     const candidate = createUtcDate(
@@ -284,7 +283,7 @@ function extractDeadlineFromText(text: string): Date | null {
     }
   }
 
-  const dmyMatch = text.match(/\b(\d{1,2})[./](\d{1,2})[./](\d{4})\b/)
+  const dmyMatch = RegExp(/\b(\d{1,2})[./](\d{1,2})[./](\d{4})\b/).exec(text)
   if (dmyMatch) {
     const [, dayRaw, monthRaw, yearRaw] = dmyMatch
     const candidate = createUtcDate(
@@ -298,7 +297,7 @@ function extractDeadlineFromText(text: string): Date | null {
     }
   }
 
-  const dmMatch = text.match(/\b(\d{1,2})[./](\d{1,2})\b/)
+  const dmMatch = RegExp(/\b(\d{1,2})[./](\d{1,2})\b/).exec(text)
   if (dmMatch) {
     const [, dayRaw, monthRaw] = dmMatch
     const now = new Date()
@@ -350,7 +349,7 @@ function extractRelativeDeadline(rawText: string): Date | null {
     return addUtcDays(today, 2)
   }
 
-  const inDaysMatch = text.match(/через\s+(\d+)\s+(дн(?:я|ей)|дня|дней)/)
+  const inDaysMatch = RegExp(/через\s+(\d+)\s+(дн(?:я|ей)|дня|дней)/).exec(text)
   if (inDaysMatch) {
     const daysAhead = Number(inDaysMatch[1])
     if (!Number.isNaN(daysAhead) && daysAhead >= 0) {
@@ -358,7 +357,7 @@ function extractRelativeDeadline(rawText: string): Date | null {
     }
   }
 
-  const inWeeksMatch = text.match(/через\s+(\d+)\s+недел(?:ю|и)/)
+  const inWeeksMatch = RegExp(/через\s+(\d+)\s+недел(?:ю|и)/).exec(text)
   if (inWeeksMatch) {
     const weeksAhead = Number(inWeeksMatch[1])
     if (!Number.isNaN(weeksAhead) && weeksAhead >= 0) {
@@ -366,9 +365,7 @@ function extractRelativeDeadline(rawText: string): Date | null {
     }
   }
 
-  const weekdayMatch = text.match(
-    /\b(?:до|к|на|в)\s+(понедельника|понедельник|пн|вторника|вторник|вт|сред[ауы]|ср|четверг|четверга|чт|пятниц[ауы]?|пт|суббот[ауы]?|сб|воскресень[ея]|вс)\b/,
-  )
+  const weekdayMatch = RegExp(/\b(?:до|к|на|в)\s+(понедельника|понедельник|пн|вторника|вторник|вт|сред[ауы]|ср|четверг|четверга|чт|пятниц[ауы]?|пт|суббот[ауы]?|сб|воскресень[ея]|вс)\b/).exec(text)
   if (weekdayMatch) {
     const weekdayRaw = weekdayMatch[1]
     const weekdayIndex =
@@ -378,9 +375,7 @@ function extractRelativeDeadline(rawText: string): Date | null {
     }
   }
 
-  const monthMatch = text.match(
-    /\b(?:до|к|на)?\s*(\d{1,2})\s+(январ[ья]|феврал[ья]|марта?|апрел[ья]|мая|июн[ья]|июл[ья]|авгус[та]?|сентябр[ья]|октябр[ья]|ноябр[ья]|декабр[ья])\b/,
-  )
+  const monthMatch = RegExp(/\b(?:до|к|на)?\s*(\d{1,2})\s+(январ[ья]|феврал[ья]|марта?|апрел[ья]|мая|июн[ья]|июл[ья]|авгус[та]?|сентябр[ья]|октябр[ья]|ноябр[ья]|декабр[ья])\b/).exec(text)
   if (monthMatch) {
     const day = Number(monthMatch[1])
     const monthName = monthMatch[2]
