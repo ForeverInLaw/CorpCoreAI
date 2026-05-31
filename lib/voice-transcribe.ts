@@ -111,6 +111,9 @@ export async function transcribeVoice(oggBuffer: Buffer): Promise<string> {
     await writeFile(tmpOgg, oggBuffer)
     tmpWav = await convertOggToWav(tmpOgg)
     const wavBuffer = await readFile(tmpWav)
+    console.log(
+      `[voice] ogg=${oggBuffer.length}B wav=${wavBuffer.length}B apiKey=${process.env.NVIDIA_API_KEY ? 'set' : 'MISSING'}`,
+    )
 
     const client = getClient()
     const results = await new Promise<RecognizeResponse>((resolve, reject) => {
@@ -130,6 +133,8 @@ export async function transcribeVoice(oggBuffer: Buffer): Promise<string> {
         },
       )
     })
+
+    console.log('[voice] gRPC response:', JSON.stringify(results, null, 2))
 
     const transcript =
       results.results?.[0]?.alternatives?.[0]?.transcript ?? ''
