@@ -15,9 +15,7 @@ services:
   cloudflared:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
-    command: ['tunnel', 'run']
-    env_file:
-      - .env
+    command: ['tunnel', '--no-autoupdate', 'run', '--token', '${TUNNEL_TOKEN}']
     depends_on:
       - app
 
