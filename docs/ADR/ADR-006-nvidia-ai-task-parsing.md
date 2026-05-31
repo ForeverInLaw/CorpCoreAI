@@ -116,9 +116,9 @@ Key points:
 
 ### New or changed tests
 
-| ID | Scenario | Level (Unit / Int / API / UI) | Expected result | Notes / Data |
-| --- | --- | --- | --- | --- |
-| TST-006-001 | Parse Russian task text | Integration | Valid JSON payload returned | Requires `NVIDIA_API_KEY` |
+| ID          | Scenario                | Level (Unit / Int / API / UI) | Expected result             | Notes / Data              |
+| ----------- | ----------------------- | ----------------------------- | --------------------------- | ------------------------- |
+| TST-006-001 | Parse Russian task text | Integration                   | Valid JSON payload returned | Requires `NVIDIA_API_KEY` |
 
 ---
 

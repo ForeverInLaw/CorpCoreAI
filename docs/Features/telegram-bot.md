@@ -51,34 +51,34 @@ Provides a conversational Telegram bot interface for task management. Users can 
 
 ### Primary flows
 
-1. **Task Creation**  
-   - Actor: User  
-   - Trigger: Send text message describing task  
-   - Steps: Bot shows "Анализирую задачу..." → AI parses → If no deadline, prompt → (Manager) Select assignee → Create task  
+1. **Task Creation**
+   - Actor: User
+   - Trigger: Send text message describing task
+   - Steps: Bot shows "Анализирую задачу..." → AI parses → If no deadline, prompt → (Manager) Select assignee → Create task
    - Result: Task created, confirmation with subtasks list shown
 
-2. **View My Tasks**  
-   - Actor: User  
-   - Trigger: Tap "Мои задачи" button or /start  
-   - Steps: Fetch latest 5 tasks → Display with inline buttons  
+2. **View My Tasks**
+   - Actor: User
+   - Trigger: Tap "Мои задачи" button or /start
+   - Steps: Fetch latest 5 tasks → Display with inline buttons
    - Result: Task list with quick access to each task
 
-3. **Update Task Status**  
-   - Actor: User (with access)  
-   - Trigger: Tap status button in task view  
-   - Steps: Validate permissions → Update status → Log history → Notify team  
+3. **Update Task Status**
+   - Actor: User (with access)
+   - Trigger: Tap status button in task view
+   - Steps: Validate permissions → Update status → Log history → Notify team
    - Result: Status updated, inline keyboard refreshed
 
-4. **Attach File**  
-   - Actor: User  
-   - Trigger: Tap "Прикрепить файл" → Select task → Send file  
-   - Steps: Show paginated task list → User selects → User sends document/photo → Save attachment  
+4. **Attach File**
+   - Actor: User
+   - Trigger: Tap "Прикрепить файл" → Select task → Send file
+   - Steps: Show paginated task list → User selects → User sends document/photo → Save attachment
    - Result: File attached, team notified
 
-5. **Explain Overdue**  
-   - Actor: Assignee  
-   - Trigger: Tap "Объяснить просрочку" on OVERDUE task  
-   - Steps: Prompt for reason → Prompt for new deadline → Update task  
+5. **Explain Overdue**
+   - Actor: Assignee
+   - Trigger: Tap "Объяснить просрочку" on OVERDUE task
+   - Steps: Prompt for reason → Prompt for new deadline → Update task
    - Result: Reason logged, new deadline set, status reset to IN_PROGRESS
 
 ### Edge cases
@@ -92,14 +92,14 @@ Provides a conversational Telegram bot interface for task management. Users can 
 
 ## System Behaviour
 
-- Entry points: Telegram Bot webhook/polling (grammy library)  
-- Reads from: PostgreSQL (Task, User, Attachment tables)  
-- Writes to: PostgreSQL (Task, TaskHistory, TaskAssignment, Attachment)  
-- Side effects: Telegram API messages to users  
-- Idempotency: Callback queries are stateful (pending state maps)  
-- Error handling: Try-catch with error logging, user-friendly Russian messages  
-- Security / permissions: Whitelist check + role-based access  
-- Feature flags: None  
+- Entry points: Telegram Bot webhook/polling (grammy library)
+- Reads from: PostgreSQL (Task, User, Attachment tables)
+- Writes to: PostgreSQL (Task, TaskHistory, TaskAssignment, Attachment)
+- Side effects: Telegram API messages to users
+- Idempotency: Callback queries are stateful (pending state maps)
+- Error handling: Try-catch with error logging, user-friendly Russian messages
+- Security / permissions: Whitelist check + role-based access
+- Feature flags: None
 - Observability: Console logging for errors
 
 ---
@@ -112,22 +112,22 @@ sequenceDiagram
     participant B as Bot
     participant AI as AI Service
     participant DB as Database
-    
+
     U->>B: Task description text
     B->>AI: Parse task
     AI-->>B: {title, subtasks, deadline}
-    
+
     alt No deadline
         B->>U: Request deadline
         U->>B: Deadline date
     end
-    
+
     alt User is Manager
         B->>DB: Fetch employees
         B->>U: Show assignee selection
         U->>B: Select assignee
     end
-    
+
     B->>DB: Create task
     B->>U: Confirmation message
 ```
@@ -138,8 +138,8 @@ sequenceDiagram
 
 ### Test environment
 
-- Environment: Local with BOT_TOKEN configured  
-- Data: Test Telegram users in WHITELIST  
+- Environment: Local with BOT_TOKEN configured
+- Data: Test Telegram users in WHITELIST
 - External dependencies: Telegram Bot API, NVIDIA AI API
 
 ### Test commands
@@ -152,40 +152,40 @@ sequenceDiagram
 
 **Positive scenarios**
 
-| ID | Description | Level | Expected result | Data / Notes |
-| --- | --- | --- | --- | --- |
+| ID      | Description                | Level       | Expected result                  | Data / Notes              |
+| ------- | -------------------------- | ----------- | -------------------------------- | ------------------------- |
 | POS-001 | Create task with full info | Integration | Task created, confirmation shown | "Сделать отчёт к пятнице" |
-| POS-002 | Attach document | Integration | File saved, team notified | Valid task, PDF file |
-| POS-003 | Update status via button | Integration | Status changed, keyboard updated | Inline callback |
+| POS-002 | Attach document            | Integration | File saved, team notified        | Valid task, PDF file      |
+| POS-003 | Update status via button   | Integration | Status changed, keyboard updated | Inline callback           |
 
 **Negative scenarios**
 
-| ID | Description | Level | Expected result | Data / Notes |
-| --- | --- | --- | --- | --- |
-| NEG-001 | Non-whitelisted user | Integration | Access denied message | Unknown Telegram ID |
-| NEG-002 | Invalid deadline format | Integration | Error message, re-prompt | "32 января" |
-| NEG-003 | File without task selection | Integration | Instruction message | Direct file send |
+| ID      | Description                 | Level       | Expected result          | Data / Notes        |
+| ------- | --------------------------- | ----------- | ------------------------ | ------------------- |
+| NEG-001 | Non-whitelisted user        | Integration | Access denied message    | Unknown Telegram ID |
+| NEG-002 | Invalid deadline format     | Integration | Error message, re-prompt | "32 января"         |
+| NEG-003 | File without task selection | Integration | Instruction message      | Direct file send    |
 
 **Edge cases**
 
-| ID | Description | Level | Expected result | Data / Notes |
-| --- | --- | --- | --- | --- |
+| ID       | Description                     | Level       | Expected result              | Data / Notes          |
+| -------- | ------------------------------- | ----------- | ---------------------------- | --------------------- |
 | EDGE-001 | Relative deadline "послезавтра" | Integration | Parsed to day after tomorrow | Russian relative date |
-| EDGE-002 | Weekday deadline "к пятнице" | Integration | Next Friday date | Russian weekday |
+| EDGE-002 | Weekday deadline "к пятнице"    | Integration | Next Friday date             | Russian weekday       |
 
 ### Test mapping
 
-- Integration tests: Manual Telegram interaction  
-- Unit tests: —  
+- Integration tests: Manual Telegram interaction
+- Unit tests: —
 - Static analysis: ESLint
 
 ---
 
 ## Definition of Done
 
-- Bot responds to all documented commands and flows  
-- Deadline parsing handles all specified formats  
-- Notifications sent correctly to stakeholders  
+- Bot responds to all documented commands and flows
+- Deadline parsing handles all specified formats
+- Notifications sent correctly to stakeholders
 - Error messages are user-friendly in Russian
 
 ---

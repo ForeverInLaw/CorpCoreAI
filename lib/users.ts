@@ -5,14 +5,14 @@ const managerIds = new Set(
   (process.env.MANAGER_IDS || '')
     .split(',')
     .map((value) => value.trim())
-    .filter(Boolean)
+    .filter(Boolean),
 )
 
 const whitelistIds = new Set(
   (process.env.WHITELIST || '')
     .split(',')
     .map((value) => value.trim())
-    .filter(Boolean)
+    .filter(Boolean),
 )
 
 export function isWhitelistedTelegramId(userId: string | bigint): boolean {

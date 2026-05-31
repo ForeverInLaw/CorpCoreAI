@@ -1,6 +1,7 @@
 # Walkthrough - Telegram Bot & WebApp
 
 ## Prerequisites
+
 - Docker & Docker Compose
 - Telegram Bot Token (from @BotFather)
 - Nvidia API Key (for AI)
@@ -9,6 +10,7 @@
 
 1.  **Environment Variables**:
     The `.env` file has been created. You must fill in the following values:
+
     ```env
     DATABASE_URL="postgresql://postgres:postgres@db:5432/corpcoreai?schema=public"
     BOT_TOKEN="your_telegram_bot_token"
@@ -22,14 +24,15 @@
     docker-compose up --build
     ```
     This will start:
-    -   PostgreSQL Database
-    -   Next.js WebApp (http://localhost:3000)
-    -   Telegram Bot
-    -   Reminder worker (runs `pnpm reminders` daily at 08:00 MSK)
+    - PostgreSQL Database
+    - Next.js WebApp (http://localhost:3000)
+    - Telegram Bot
+    - Reminder worker (runs `pnpm reminders` daily at 08:00 MSK)
 
 ## Usage
 
 ### Bot
+
 1.  Start the bot in Telegram.
 2.  Send a text message describing a task (e.g., "Prepare monthly report by Friday").
 3.  The bot will use AI to generate a title and subtasks, then save it to the database.
@@ -38,20 +41,23 @@
 6.  Notifications: reminders are sent automatically — ежедневные напоминания, предупреждение за сутки до дедлайна, уведомление в день дедлайна, а также уведомления о просрочках (с эскалацией менеджеру). Логику выполняет скрипт `scripts/reminders.ts`.
 
 ### WebApp
+
 1.  Open [http://localhost:3000](http://localhost:3000) **inside Telegram WebApp**.
 2.  **Authentication & Access Control**:
-    -   The app strictly requires Telegram context and validates `initData`.
-    -   Only users from `WHITELIST` may load data; others see an "Access Restricted" message.
-    -   UI adapts to role: managers get employee filters, aggregated tasks; employees only see their own tasks.
+    - The app strictly requires Telegram context and validates `initData`.
+    - Only users from `WHITELIST` may load data; others see an "Access Restricted" message.
+    - UI adapts to role: managers get employee filters, aggregated tasks; employees only see their own tasks.
 3.  **Dashboard & Attachments**
-    -   Shows all task statuses (In Progress, Done, Paused, Overdue, Closed), assignee/creator labels, deadline indicators (with an "Overdue" badge when appropriate), and retry handling for transient fetch errors.
-    -   File uploads from the WebApp are stored privately under `storage/uploads` (never exposed via `public`).
-    -   Clicking an attachment triggers `POST /api/attachments/[attachmentId]/token`, which validates auth/permissions and returns a download URL valid for 5 minutes.
-    -   The browser immediately opens `GET /api/attachments/download/[token]`, which proxies Telegram files or streams the private file path, then invalidates the token so links cannot be reused.
-    -   Unauthorized users cannot obtain tokens, so even a leaked URL expires quickly and becomes unusable.
+    - Shows all task statuses (In Progress, Done, Paused, Overdue, Closed), assignee/creator labels, deadline indicators (with an "Overdue" badge when appropriate), and retry handling for transient fetch errors.
+    - File uploads from the WebApp are stored privately under `storage/uploads` (never exposed via `public`).
+    - Clicking an attachment triggers `POST /api/attachments/[attachmentId]/token`, which validates auth/permissions and returns a download URL valid for 5 minutes.
+    - The browser immediately opens `GET /api/attachments/download/[token]`, which proxies Telegram files or streams the private file path, then invalidates the token so links cannot be reused.
+    - Unauthorized users cannot obtain tokens, so even a leaked URL expires quickly and becomes unusable.
 
 ## Development
+
 To run locally without Docker:
+
 1.  Start DB (e.g., via Docker or local Postgres).
 2.  Update `DATABASE_URL` in `.env` to point to localhost.
 3.  Run migrations: `npx prisma migrate dev`.

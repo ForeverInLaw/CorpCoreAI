@@ -8,23 +8,39 @@ import { prisma } from '@/lib/db'
 import { validateTelegramWebAppData } from '@/lib/auth'
 import { ensureTelegramUser, isWhitelistedTelegramId } from '@/lib/users'
 import { saveExternalAttachment } from '@/lib/attachments'
-import { ensureStorageRoot, buildStoredFilePath, toRelativeStoragePath } from '@/lib/storage'
+import {
+  ensureStorageRoot,
+  buildStoredFilePath,
+  toRelativeStoragePath,
+} from '@/lib/storage'
 import { bot } from '@/lib/bot'
 
 const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024 // 2GB (Telegram limit)
 const ALLOWED_MIME_TYPES = new Set([
-  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/heic',
+  'image/heif',
   'application/pdf',
-  'text/plain', 'text/csv',
+  'text/plain',
+  'text/csv',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.ms-excel',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.ms-powerpoint',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed',
-  'video/mp4', 'video/quicktime', 'video/x-msvideo',
-  'audio/mpeg', 'audio/ogg', 'audio/wav',
+  'application/zip',
+  'application/x-rar-compressed',
+  'application/x-7z-compressed',
+  'video/mp4',
+  'video/quicktime',
+  'video/x-msvideo',
+  'audio/mpeg',
+  'audio/ogg',
+  'audio/wav',
 ])
 const MAX_MIME_TYPE_LENGTH = 200
 function sanitizeFileName(name: string) {
@@ -63,22 +79,36 @@ async function notifyManagerAboutAttachmentUploadFromWebApp({
   try {
     await bot.api.sendMessage(Number(task.creatorId), message)
   } catch (error) {
-    console.error('Failed to notify manager about attachment upload (WebApp)', error)
+    console.error(
+      'Failed to notify manager about attachment upload (WebApp)',
+      error,
+    )
   }
 }
 
-function canUploadToTask(task: { creatorId: bigint; assigneeId: bigint | null }, userId: bigint, role: 'EMPLOYEE' | 'MANAGER') {
+function canUploadToTask(
+  task: { creatorId: bigint; assigneeId: bigint | null },
+  userId: bigint,
+  role: 'EMPLOYEE' | 'MANAGER',
+) {
   if (role === 'MANAGER') return true
   if (task.creatorId === userId) return true
   if (task.assigneeId && task.assigneeId === userId) return true
   return false
 }
 
-export async function POST(request: Request, context: { params: Promise<{ taskId: string }> | { taskId: string } }) {
-  const resolvedParams = 'then' in context.params ? await context.params : context.params
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ taskId: string }> | { taskId: string } },
+) {
+  const resolvedParams =
+    'then' in context.params ? await context.params : context.params
   const initData = request.headers.get('Authorization')
   if (!initData) {
-    return NextResponse.json({ error: 'Authorization header missing' }, { status: 401 })
+    return NextResponse.json(
+      { error: 'Authorization header missing' },
+      { status: 401 },
+    )
   }
 
   const taskIdRaw = resolvedParams.taskId
@@ -118,8 +148,8 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
           select: {
             role: true,
             name: true,
-          }
-        }
+          },
+        },
       },
     })
 
@@ -128,7 +158,10 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
     }
 
     if (!canUploadToTask(task, telegramUser.id, telegramUser.role)) {
-      return NextResponse.json({ error: 'You are not allowed to upload files for this task' }, { status: 403 })
+      return NextResponse.json(
+        { error: 'You are not allowed to upload files for this task' },
+        { status: 403 },
+      )
     }
 
     const formData = await request.formData()
@@ -139,12 +172,21 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
     }
 
     if (file.size > MAX_UPLOAD_BYTES) {
-      return NextResponse.json({ error: 'File exceeds 2GB limit' }, { status: 413 })
+      return NextResponse.json(
+        { error: 'File exceeds 2GB limit' },
+        { status: 413 },
+      )
     }
 
     const mimeType = file.type || ''
-    if (mimeType.length > MAX_MIME_TYPE_LENGTH || (mimeType && !ALLOWED_MIME_TYPES.has(mimeType))) {
-      return NextResponse.json({ error: 'File type not allowed' }, { status: 415 })
+    if (
+      mimeType.length > MAX_MIME_TYPE_LENGTH ||
+      (mimeType && !ALLOWED_MIME_TYPES.has(mimeType))
+    ) {
+      return NextResponse.json(
+        { error: 'File type not allowed' },
+        { status: 415 },
+      )
     }
 
     await ensureStorageRoot()
@@ -155,7 +197,9 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
     const destPath = buildStoredFilePath(uniqueName)
     const storagePath = toRelativeStoragePath(destPath)
 
-    const nodeStream = Readable.fromWeb(file.stream() as import('node:stream/web').ReadableStream)
+    const nodeStream = Readable.fromWeb(
+      file.stream() as import('node:stream/web').ReadableStream,
+    )
     await pipeline(nodeStream, createWriteStream(destPath))
 
     const attachment = await saveExternalAttachment({
@@ -167,7 +211,11 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
       storagePath,
     })
 
-    await notifyManagerAboutAttachmentUploadFromWebApp({ task, uploader: telegramUser, attachment })
+    await notifyManagerAboutAttachmentUploadFromWebApp({
+      task,
+      uploader: telegramUser,
+      attachment,
+    })
 
     return NextResponse.json({
       attachment: {
@@ -182,6 +230,9 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
     })
   } catch (error) {
     console.error('Failed to upload attachment', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Internal Server Error' },
+      { status: 500 },
+    )
   }
 }

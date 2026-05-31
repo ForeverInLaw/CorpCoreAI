@@ -122,12 +122,12 @@ Key points:
 
 ### New or changed tests
 
-| ID | Scenario | Level (Unit / Int / API / UI) | Expected result | Notes / Data |
-| --- | --- | --- | --- | --- |
-| TST-001 | GET /api/tasks | API | Returns task list | Authenticated user |
-| TST-002 | POST /api/tasks | API | Creates new task | Manager role |
-| TST-003 | PATCH /api/tasks/[id] | API | Updates task | Valid task ID |
-| TST-004 | Unauthorized access | API | 401/403 response | Missing/invalid auth |
+| ID      | Scenario              | Level (Unit / Int / API / UI) | Expected result   | Notes / Data         |
+| ------- | --------------------- | ----------------------------- | ----------------- | -------------------- |
+| TST-001 | GET /api/tasks        | API                           | Returns task list | Authenticated user   |
+| TST-002 | POST /api/tasks       | API                           | Creates new task  | Manager role         |
+| TST-003 | PATCH /api/tasks/[id] | API                           | Updates task      | Valid task ID        |
+| TST-004 | Unauthorized access   | API                           | 401/403 response  | Missing/invalid auth |
 
 ### Regression and analysis
 

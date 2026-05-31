@@ -3,7 +3,10 @@ const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
 const WINDOW_MS = 60 * 1000 // 1 minute
 const MAX_REQUESTS = 60
 
-export function checkRateLimit(identifier: string): { rateLimited: boolean; remaining: number } {
+export function checkRateLimit(identifier: string): {
+  rateLimited: boolean
+  remaining: number
+} {
   const now = Date.now()
   const entry = rateLimitMap.get(identifier)
 

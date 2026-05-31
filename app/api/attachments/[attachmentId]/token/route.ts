@@ -6,9 +6,13 @@ import { ensureTelegramUser, isWhitelistedTelegramId } from '@/lib/users'
 import { createDownloadToken } from '@/lib/download-tokens'
 
 function canAccessAttachment(
-  task: { creatorId: bigint; assigneeId: bigint | null; assignments?: { userId: bigint }[] },
+  task: {
+    creatorId: bigint
+    assigneeId: bigint | null
+    assignments?: { userId: bigint }[]
+  },
   userId: bigint,
-  role: 'EMPLOYEE' | 'MANAGER'
+  role: 'EMPLOYEE' | 'MANAGER',
 ) {
   if (role === 'MANAGER') return true
   if (task.creatorId === userId) return true
@@ -17,16 +21,28 @@ function canAccessAttachment(
   return false
 }
 
-export async function POST(request: Request, context: { params: Promise<{ attachmentId: string }> | { attachmentId: string } }) {
-  const resolvedParams = 'then' in context.params ? await context.params : context.params
+export async function POST(
+  request: Request,
+  context: {
+    params: Promise<{ attachmentId: string }> | { attachmentId: string }
+  },
+) {
+  const resolvedParams =
+    'then' in context.params ? await context.params : context.params
   const initData = request.headers.get('Authorization')
   if (!initData) {
-    return NextResponse.json({ error: 'Authorization header missing' }, { status: 401 })
+    return NextResponse.json(
+      { error: 'Authorization header missing' },
+      { status: 401 },
+    )
   }
 
   const attachmentId = Number(resolvedParams.attachmentId)
   if (!Number.isInteger(attachmentId) || attachmentId <= 0) {
-    return NextResponse.json({ error: 'Invalid attachment ID' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Invalid attachment ID' },
+      { status: 400 },
+    )
   }
 
   const userPayload = validateTelegramWebAppData(initData)
@@ -65,12 +81,21 @@ export async function POST(request: Request, context: { params: Promise<{ attach
     return NextResponse.json({ error: 'Attachment not found' }, { status: 404 })
   }
 
-  if (!canAccessAttachment(attachment.task, telegramUser.id, telegramUser.role)) {
-    return NextResponse.json({ error: 'You are not allowed to download this attachment' }, { status: 403 })
+  if (
+    !canAccessAttachment(attachment.task, telegramUser.id, telegramUser.role)
+  ) {
+    return NextResponse.json(
+      { error: 'You are not allowed to download this attachment' },
+      { status: 403 },
+    )
   }
 
   const token = await createDownloadToken(attachment.id)
   const downloadUrl = `/api/attachments/download/${token.token}`
 
-  return NextResponse.json({ token: token.token, url: downloadUrl, expiresAt: token.expiresAt.toISOString() })
+  return NextResponse.json({
+    token: token.token,
+    url: downloadUrl,
+    expiresAt: token.expiresAt.toISOString(),
+  })
 }

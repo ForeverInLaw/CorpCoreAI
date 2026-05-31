@@ -124,10 +124,10 @@ Key points:
 
 ### New or changed tests
 
-| ID | Scenario | Level (Unit / Int / API / UI) | Expected result | Notes / Data |
-| --- | --- | --- | --- | --- |
-| TST-001 | Build succeeds | Integration | No build errors | Production build |
-| TST-002 | API routes respond | API | 200/401 responses | All endpoints |
+| ID      | Scenario           | Level (Unit / Int / API / UI) | Expected result   | Notes / Data     |
+| ------- | ------------------ | ----------------------------- | ----------------- | ---------------- |
+| TST-001 | Build succeeds     | Integration                   | No build errors   | Production build |
+| TST-002 | API routes respond | API                           | 200/401 responses | All endpoints    |
 
 ### Regression and analysis
 

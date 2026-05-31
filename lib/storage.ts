@@ -21,7 +21,9 @@ export function resolveStoragePath(storagePath: string) {
     : path.resolve(process.cwd(), storagePath)
 
   if (!resolved.startsWith(STORAGE_ROOT)) {
-    throw new Error('Path traversal detected: storage path resolves outside STORAGE_ROOT')
+    throw new Error(
+      'Path traversal detected: storage path resolves outside STORAGE_ROOT',
+    )
   }
 
   return resolved

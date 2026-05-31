@@ -40,71 +40,77 @@ tests/
 **Purpose:** Test individual functions and components in isolation.
 
 **Scope:**
+
 - Library utilities (`lib/*.ts`)
 - React components (`components/*.tsx`)
 - Pure functions and helpers
 
 **Recommended Tools:**
+
 - [Vitest](https://vitest.dev/) — Fast unit test runner compatible with Vite
 - [Testing Library](https://testing-library.com/) — React component testing
 - [MSW](https://mswjs.io/) — API mocking
 
 **Example Test Cases:**
 
-| Module | Test Case |
-|--------|-----------|
-| `lib/auth.ts` | Validates Telegram init data correctly |
-| `lib/auth.ts` | Rejects expired or tampered init data |
-| `lib/ai.ts` | Parses AI-generated task structure |
-| `lib/attachments.ts` | Generates correct download URLs |
-| `lib/task-history.ts` | Creates proper history entries |
-| `TaskCard.tsx` | Renders task with correct status badge |
-| `TaskCard.tsx` | Displays deadline in user timezone |
+| Module                | Test Case                              |
+| --------------------- | -------------------------------------- |
+| `lib/auth.ts`         | Validates Telegram init data correctly |
+| `lib/auth.ts`         | Rejects expired or tampered init data  |
+| `lib/ai.ts`           | Parses AI-generated task structure     |
+| `lib/attachments.ts`  | Generates correct download URLs        |
+| `lib/task-history.ts` | Creates proper history entries         |
+| `TaskCard.tsx`        | Renders task with correct status badge |
+| `TaskCard.tsx`        | Displays deadline in user timezone     |
 
 ### Integration Tests
 
 **Purpose:** Test interactions between components and external services.
 
 **Scope:**
+
 - API routes (`app/api/**/*.ts`)
 - Database operations via Prisma
 - Telegram bot command handlers
 
 **Recommended Tools:**
+
 - [Vitest](https://vitest.dev/) with database fixtures
 - [Supertest](https://github.com/ladjs/supertest) — HTTP assertion library
 - Test database (PostgreSQL in Docker)
 
 **Example Test Cases:**
 
-| API Endpoint | Test Case |
-|--------------|-----------|
-| `GET /api/tasks` | Returns tasks for authenticated user |
-| `POST /api/tasks` | Creates task with valid data |
-| `PATCH /api/tasks/[id]` | Updates task status |
-| `POST /api/tasks/[id]/attachments` | Uploads file attachment |
-| `GET /api/attachments/download/[token]` | Downloads file with valid token |
+| API Endpoint                            | Test Case                            |
+| --------------------------------------- | ------------------------------------ |
+| `GET /api/tasks`                        | Returns tasks for authenticated user |
+| `POST /api/tasks`                       | Creates task with valid data         |
+| `PATCH /api/tasks/[id]`                 | Updates task status                  |
+| `POST /api/tasks/[id]/attachments`      | Uploads file attachment              |
+| `GET /api/attachments/download/[token]` | Downloads file with valid token      |
 
 **Bot Command Tests:**
 
-| Command | Test Case |
-|---------|-----------|
-| `/start` | Registers new user correctly |
-| `/tasks` | Lists user's tasks |
+| Command          | Test Case                         |
+| ---------------- | --------------------------------- |
+| `/start`         | Registers new user correctly      |
+| `/tasks`         | Lists user's tasks                |
 | Natural language | Parses deadline from Russian text |
-| File upload | Attaches file to active task |
+| File upload      | Attaches file to active task      |
 
 ### End-to-End Tests
 
 **Purpose:** Test complete user workflows through the entire system.
 
 **Scope:**
+
 - Full task lifecycle (create → assign → complete → review)
 - User authentication flow
 - File attachment workflow
 - Reminder notifications
 
 **Recommended Tools:**
+
 - [Playwright](https://playwright.dev/) — Browser automation
 - Docker Compose for test environment
 - Mock Telegram API server
@@ -183,9 +189,9 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      exclude: ['node_modules', 'tests']
-    }
-  }
+      exclude: ['node_modules', 'tests'],
+    },
+  },
 })
 ```
 
@@ -201,16 +207,16 @@ services:
       POSTGRES_PASSWORD: test
       POSTGRES_DB: corpcoreai_test
     ports:
-      - "5433:5432"
+      - '5433:5432'
 ```
 
 ## Coverage Goals
 
-| Category | Target Coverage |
-|----------|-----------------|
-| Unit Tests | 80%+ |
-| Integration Tests | 70%+ |
-| E2E Tests | Critical paths covered |
+| Category          | Target Coverage        |
+| ----------------- | ---------------------- |
+| Unit Tests        | 80%+                   |
+| Integration Tests | 70%+                   |
+| E2E Tests         | Critical paths covered |
 
 ## Continuous Integration
 
@@ -225,7 +231,7 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     services:
       postgres:
         image: postgres:18-alpine
@@ -235,7 +241,7 @@ jobs:
           POSTGRES_DB: corpcoreai_test
         ports:
           - 5432:5432
-    
+
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v2
@@ -243,41 +249,46 @@ jobs:
         with:
           node-version: 20
           cache: 'pnpm'
-      
+
       - run: pnpm install
       - run: pnpm prisma generate
       - run: pnpm prisma migrate deploy
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/corpcoreai_test
-      
+
       # - run: pnpm test:coverage  # planned, not yet implemented
 ```
 
 ## Implementation Roadmap
 
 ### Phase 1: Foundation
+
 - [ ] Add Vitest and Testing Library dependencies
 - [ ] Create test configuration files
 - [ ] Set up test database Docker configuration
 - [ ] Create test fixtures for common data
 
 ### Phase 2: Unit Tests
+
 - [ ] Test `lib/auth.ts` — Telegram authentication
 - [ ] Test `lib/ai.ts` — AI response parsing
 - [ ] Test `lib/task-history.ts` — History entry creation
 - [ ] Test React components with Testing Library
 
 ### Phase 3: Integration Tests
+
 - [ ] Test API routes with Supertest
 - [ ] Test database operations with test fixtures
 - [ ] Test bot command handlers
 
 ### Phase 4: E2E Tests
+
 - [ ] Set up Playwright
 - [ ] Create WebApp user flow tests
 - [ ] Create bot interaction tests (with mock Telegram API)
 
 ### Phase 5: CI/CD
+
 - [ ] Configure GitHub Actions workflow
 - [ ] Add coverage reporting
 - [ ] Set up PR checks

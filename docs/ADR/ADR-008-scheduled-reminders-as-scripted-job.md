@@ -120,10 +120,10 @@ Key points:
 
 ### New or changed tests
 
-| ID | Scenario | Level (Unit / Int / API / UI) | Expected result | Notes / Data |
-| --- | --- | --- | --- | --- |
-| TST-008-001 | Daily reminder only once per day | Integration | Second run sends nothing | Same day re-run |
-| TST-008-002 | Overdue task becomes OVERDUE | Integration | Status updated + notifications | deadline in past |
+| ID          | Scenario                         | Level (Unit / Int / API / UI) | Expected result                | Notes / Data     |
+| ----------- | -------------------------------- | ----------------------------- | ------------------------------ | ---------------- |
+| TST-008-001 | Daily reminder only once per day | Integration                   | Second run sends nothing       | Same day re-run  |
+| TST-008-002 | Overdue task becomes OVERDUE     | Integration                   | Status updated + notifications | deadline in past |
 
 ---
 

@@ -13,7 +13,10 @@ export type DownloadTokenRecord = DownloadToken & {
   }
 }
 
-export async function createDownloadToken(attachmentId: number, ttlMs = DOWNLOAD_TOKEN_TTL_MS) {
+export async function createDownloadToken(
+  attachmentId: number,
+  ttlMs = DOWNLOAD_TOKEN_TTL_MS,
+) {
   const expiresAt = new Date(Date.now() + ttlMs)
 
   return prisma.downloadToken.create({
@@ -24,7 +27,9 @@ export async function createDownloadToken(attachmentId: number, ttlMs = DOWNLOAD
   })
 }
 
-export async function consumeDownloadToken(token: string): Promise<{ record: DownloadTokenRecord | null; expired: boolean }> {
+export async function consumeDownloadToken(
+  token: string,
+): Promise<{ record: DownloadTokenRecord | null; expired: boolean }> {
   const now = new Date()
 
   let record: DownloadTokenRecord
@@ -45,7 +50,12 @@ export async function consumeDownloadToken(token: string): Promise<{ record: Dow
       },
     })) as DownloadTokenRecord
   } catch (e: unknown) {
-    if (typeof e === 'object' && e !== null && 'code' in e && (e as { code: string }).code === 'P2025') {
+    if (
+      typeof e === 'object' &&
+      e !== null &&
+      'code' in e &&
+      (e as { code: string }).code === 'P2025'
+    ) {
       return { record: null, expired: false }
     }
     throw e

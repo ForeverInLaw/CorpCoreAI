@@ -8,7 +8,10 @@ export function proxy(request: NextRequest) {
 
     const { rateLimited } = checkRateLimit(identifier)
     if (rateLimited) {
-      return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+      return NextResponse.json(
+        { error: 'Rate limit exceeded' },
+        { status: 429 },
+      )
     }
   }
 

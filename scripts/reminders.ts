@@ -48,7 +48,10 @@ function formatDate(date?: Date | null) {
   return date.toLocaleDateString('ru-RU')
 }
 
-async function sendMessageSafe(userId: bigint | null | undefined, text: string) {
+async function sendMessageSafe(
+  userId: bigint | null | undefined,
+  text: string,
+) {
   if (!userId) return false
 
   try {
@@ -64,19 +67,26 @@ function isTerminal(status: TaskStatus) {
   return TERMINAL_STATUSES.has(status)
 }
 
-async function handleDailyReminder(task: TaskWithRelations, todayUtc: Date): Promise<UpdateData> {
+async function handleDailyReminder(
+  task: TaskWithRelations,
+  todayUtc: Date,
+): Promise<UpdateData> {
   if (task.status !== TaskStatus.IN_PROGRESS || !task.assigneeId) return {}
-  if (task.lastDailyReminderAt && task.lastDailyReminderAt >= todayUtc) return {}
+  if (task.lastDailyReminderAt && task.lastDailyReminderAt >= todayUtc)
+    return {}
 
   const sent = await sendMessageSafe(
     task.assigneeId,
-    `Напоминание: задача "${task.title}" все еще в работе. Дедлайн: ${formatDate(task.deadline)}.`
+    `Напоминание: задача "${task.title}" все еще в работе. Дедлайн: ${formatDate(task.deadline)}.`,
   )
 
   return sent ? { lastDailyReminderAt: new Date() } : {}
 }
 
-async function handleDeadlineWindow(task: TaskWithRelations, todayUtc: Date): Promise<UpdateData> {
+async function handleDeadlineWindow(
+  task: TaskWithRelations,
+  todayUtc: Date,
+): Promise<UpdateData> {
   if (!task.deadline || !task.assigneeId || isTerminal(task.status)) return {}
 
   const now = new Date()
@@ -86,7 +96,7 @@ async function handleDeadlineWindow(task: TaskWithRelations, todayUtc: Date): Pr
   if (daysDiff === 1 && !task.lastDeadlineReminderAt) {
     const sent = await sendMessageSafe(
       task.assigneeId,
-      `До дедлайна по задаче "${task.title}" остался 1 день (до ${formatDate(task.deadline)}).`
+      `До дедлайна по задаче "${task.title}" остался 1 день (до ${formatDate(task.deadline)}).`,
     )
     if (sent) updates.lastDeadlineReminderAt = now
   }
@@ -94,7 +104,7 @@ async function handleDeadlineWindow(task: TaskWithRelations, todayUtc: Date): Pr
   if (daysDiff === 0 && !task.deadlineDayNotifiedAt) {
     const sent = await sendMessageSafe(
       task.assigneeId,
-      `Сегодня дедлайн задачи "${task.title}" (${formatDate(task.deadline)}). Не забудьте обновить статус.`
+      `Сегодня дедлайн задачи "${task.title}" (${formatDate(task.deadline)}). Не забудьте обновить статус.`,
     )
     if (sent) updates.deadlineDayNotifiedAt = now
   }
@@ -102,7 +112,10 @@ async function handleDeadlineWindow(task: TaskWithRelations, todayUtc: Date): Pr
   return updates
 }
 
-async function handleOverdue(task: TaskWithRelations, todayUtc: Date): Promise<UpdateData> {
+async function handleOverdue(
+  task: TaskWithRelations,
+  todayUtc: Date,
+): Promise<UpdateData> {
   if (!task.deadline || !task.assigneeId) return {}
 
   const daysDiff = daysUntil(task.deadline, todayUtc)
@@ -119,17 +132,19 @@ async function handleOverdue(task: TaskWithRelations, todayUtc: Date): Promise<U
   if (!task.overdueNotifiedAt) {
     const sent = await sendMessageSafe(
       task.assigneeId,
-      `Задача "${task.title}" просрочена (дедлайн был ${formatDate(task.deadline)}). Укажите новый срок или обновите статус.`
+      `Задача "${task.title}" просрочена (дедлайн был ${formatDate(task.deadline)}). Укажите новый срок или обновите статус.`,
     )
     if (sent) updates.overdueNotifiedAt = now
   }
 
-  const managerId = task.creator?.role === UserRole.MANAGER ? task.creatorId : null
+  const managerId =
+    task.creator?.role === UserRole.MANAGER ? task.creatorId : null
   if (managerId && !task.managerOverdueNotifiedAt) {
-    const assigneeName = task.assignee?.name || `ID ${task.assigneeId.toString()}`
+    const assigneeName =
+      task.assignee?.name || `ID ${task.assigneeId.toString()}`
     const sent = await sendMessageSafe(
       managerId,
-      `Задача "${task.title}" у ${assigneeName} просрочена (дедлайн ${formatDate(task.deadline)}).`
+      `Задача "${task.title}" у ${assigneeName} просрочена (дедлайн ${formatDate(task.deadline)}).`,
     )
     if (sent) updates.managerOverdueNotifiedAt = now
   }
@@ -181,7 +196,10 @@ async function cleanupOldHistory() {
   const { count } = await prisma.taskHistory.deleteMany({
     where: { createdAt: { lt: cutoff } },
   })
-  if (count > 0) console.log(`[cleanup] Deleted ${count} TaskHistory entries older than ${HISTORY_RETENTION_DAYS} days`)
+  if (count > 0)
+    console.log(
+      `[cleanup] Deleted ${count} TaskHistory entries older than ${HISTORY_RETENTION_DAYS} days`,
+    )
 }
 
 void (async () => {

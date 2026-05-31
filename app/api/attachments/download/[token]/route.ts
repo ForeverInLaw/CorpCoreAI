@@ -22,7 +22,9 @@ function sanitizeFileName(name: string): string {
 }
 
 async function fetchTelegramFile(telegramFileId: string) {
-  const response = await fetch(`${TELEGRAM_API_BASE}/getFile?file_id=${encodeURIComponent(telegramFileId)}`)
+  const response = await fetch(
+    `${TELEGRAM_API_BASE}/getFile?file_id=${encodeURIComponent(telegramFileId)}`,
+  )
   if (!response.ok) {
     throw new Error('Failed to resolve Telegram file')
   }
@@ -41,17 +43,27 @@ async function fetchTelegramFile(telegramFileId: string) {
   return fileResponse
 }
 
-export async function GET(request: Request, context: { params: Promise<{ token: string }> | { token: string } }) {
-  const resolvedParams = 'then' in context.params ? await context.params : context.params
+export async function GET(
+  request: Request,
+  context: { params: Promise<{ token: string }> | { token: string } },
+) {
+  const resolvedParams =
+    'then' in context.params ? await context.params : context.params
   const token = resolvedParams.token
 
   const { record, expired } = await consumeDownloadToken(token)
   if (!record) {
-    return NextResponse.json({ error: 'Download link not found' }, { status: 404 })
+    return NextResponse.json(
+      { error: 'Download link not found' },
+      { status: 404 },
+    )
   }
 
   if (expired) {
-    return NextResponse.json({ error: 'Download link expired' }, { status: 410 })
+    return NextResponse.json(
+      { error: 'Download link expired' },
+      { status: 410 },
+    )
   }
 
   const attachment = record.attachment
@@ -60,7 +72,10 @@ export async function GET(request: Request, context: { params: Promise<{ token: 
     try {
       const fileResponse = await fetchTelegramFile(attachment.telegramFileId)
       const headers = new Headers(fileResponse.headers)
-      headers.set('Content-Disposition', `attachment; filename="${sanitizeFileName(attachment.fileName ?? attachment.type)}"`)
+      headers.set(
+        'Content-Disposition',
+        `attachment; filename="${sanitizeFileName(attachment.fileName ?? attachment.type)}"`,
+      )
       headers.set('X-Content-Type-Options', 'nosniff')
       headers.set('X-Accel-Buffering', 'no')
       return new NextResponse(fileResponse.body, {
@@ -69,12 +84,18 @@ export async function GET(request: Request, context: { params: Promise<{ token: 
       })
     } catch (error) {
       console.error('Failed to proxy Telegram file', error)
-      return NextResponse.json({ error: 'Failed to download file' }, { status: 502 })
+      return NextResponse.json(
+        { error: 'Failed to download file' },
+        { status: 502 },
+      )
     }
   }
 
   if (!attachment.storagePath) {
-    return NextResponse.json({ error: 'Attachment storage path missing' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Attachment storage path missing' },
+      { status: 500 },
+    )
   }
 
   try {
@@ -84,12 +105,18 @@ export async function GET(request: Request, context: { params: Promise<{ token: 
     if (attachment.mimeType) {
       headers.set('Content-Type', attachment.mimeType)
     }
-    headers.set('Content-Disposition', `attachment; filename="${sanitizeFileName(attachment.fileName ?? attachment.type)}"`)
+    headers.set(
+      'Content-Disposition',
+      `attachment; filename="${sanitizeFileName(attachment.fileName ?? attachment.type)}"`,
+    )
     headers.set('X-Content-Type-Options', 'nosniff')
     headers.set('Content-Length', buffer.byteLength.toString())
     return new NextResponse(buffer, { status: 200, headers })
   } catch (error) {
     console.error('Failed to read attachment from storage', error)
-    return NextResponse.json({ error: 'Failed to download file' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to download file' },
+      { status: 500 },
+    )
   }
 }

@@ -5,6 +5,7 @@ This guide covers how to set up and run the CorpCore AI project locally.
 ## Overview
 
 CorpCore AI is a task management system that combines:
+
 - **Telegram Bot** — Accepts natural-language task descriptions and manages tasks via chat
 - **Telegram WebApp** — Next.js-based UI for viewing and managing tasks
 - **AI Integration** — NVIDIA Minimax for generating task titles and subtasks
@@ -14,12 +15,12 @@ CorpCore AI is a task management system that combines:
 
 ### Required Tools
 
-| Tool | Version | Purpose |
-|------|---------|---------|
-| Node.js | 20.x | JavaScript runtime |
-| pnpm | Latest | Package manager |
-| PostgreSQL | 18.x | Database |
-| Docker & Docker Compose | Latest | Containerized deployment (optional) |
+| Tool                    | Version | Purpose                             |
+| ----------------------- | ------- | ----------------------------------- |
+| Node.js                 | 20.x    | JavaScript runtime                  |
+| pnpm                    | Latest  | Package manager                     |
+| PostgreSQL              | 18.x    | Database                            |
+| Docker & Docker Compose | Latest  | Containerized deployment (optional) |
 
 ### Environment Variables
 
@@ -46,36 +47,42 @@ MANAGER_IDS="123456789"          # Comma-separated manager Telegram IDs
 ### Option 1: Local Development
 
 1. **Clone the repository**
+
    ```bash
    git clone <repository-url>
    cd CorpCoreAi
    ```
 
 2. **Install dependencies**
+
    ```bash
    pnpm install
    ```
 
 3. **Set up the database**
-   
+
    Ensure PostgreSQL is running, then run migrations:
+
    ```bash
    pnpm prisma migrate deploy
    ```
 
 4. **Generate Prisma client**
+
    ```bash
    pnpm prisma generate
    ```
 
 5. **Start the development server**
+
    ```bash
    pnpm dev
    ```
-   
+
    The app will be available at [http://localhost:3000](http://localhost:3000)
 
 6. **Start the Telegram bot** (in a separate terminal)
+
    ```bash
    pnpm bot
    ```
@@ -88,6 +95,7 @@ MANAGER_IDS="123456789"          # Comma-separated manager Telegram IDs
 ### Option 2: Docker Deployment
 
 1. **Clone the repository**
+
    ```bash
    git clone <repository-url>
    cd CorpCoreAi
@@ -96,6 +104,7 @@ MANAGER_IDS="123456789"          # Comma-separated manager Telegram IDs
 2. **Create `.env` file** with required environment variables (see above)
 
 3. **Start all services**
+
    ```bash
    docker-compose up -d
    ```
@@ -108,6 +117,7 @@ MANAGER_IDS="123456789"          # Comma-separated manager Telegram IDs
    - `migrate` — Database migration runner (runs once)
 
 4. **View logs**
+
    ```bash
    docker-compose logs -f
    ```
@@ -119,14 +129,16 @@ MANAGER_IDS="123456789"          # Comma-separated manager Telegram IDs
 
 ## Available Scripts
 
-| Script | Command | Description |
-|--------|---------|-------------|
-| `dev` | `pnpm dev` | Start Next.js development server |
-| `build` | `pnpm build` | Build production bundle |
-| `start` | `pnpm start` | Start production server |
-| `lint` | `pnpm lint` | Run ESLint |
-| `bot` | `pnpm bot` | Start Telegram bot |
-| `reminders` | `pnpm reminders` | Run reminder job |
+| Script         | Command             | Description                           |
+| -------------- | ------------------- | ------------------------------------- |
+| `dev`          | `pnpm dev`          | Start Next.js development server      |
+| `build`        | `pnpm build`        | Build production bundle               |
+| `start`        | `pnpm start`        | Start production server               |
+| `lint`         | `pnpm lint`         | Run ESLint                            |
+| `format`       | `pnpm format`       | Format all files with Prettier        |
+| `format:check` | `pnpm format:check` | Check formatting without writing (CI) |
+| `bot`          | `pnpm bot`          | Start Telegram bot                    |
+| `reminders`    | `pnpm reminders`    | Run reminder job                      |
 
 ## Project Structure
 
@@ -171,9 +183,16 @@ CorpCoreAi/
 └── docker-compose.yml    # 5 services: app, bot, reminders, migrate, db
 ```
 
+## Code Style
+
+- **Prettier** — Formats all code on save/commit. Config: `.prettierrc` (no semicolons, single quotes, trailing commas, Tailwind class sorting).
+- **ESLint** — Lints TypeScript/Next.js. Config: `eslint.config.mjs`.
+- Run `pnpm format` before committing. CI uses `pnpm format:check`.
+
 ## Database Schema
 
 Key models:
+
 - **User** — Telegram users with roles (EMPLOYEE, MANAGER)
 - **Task** — Task records with status, deadline, subtasks
 - **Project** — Project groupings for tasks

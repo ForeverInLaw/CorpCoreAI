@@ -18,13 +18,35 @@ interface UiState {
   setUpdateError: (taskId: string, msg: string) => void
   setDeadlineDraft: (taskId: string, draft: string) => void
   setTeamDraft: (taskId: string, draft: TaskAssignmentMember[]) => void
-  updateTeamDraft: (taskId: string, updater: (current: TaskAssignmentMember[]) => TaskAssignmentMember[]) => void
+  updateTeamDraft: (
+    taskId: string,
+    updater: (current: TaskAssignmentMember[]) => TaskAssignmentMember[],
+  ) => void
   setTeamError: (taskId: string, msg: string) => void
-  initDrafts: (tasks: { id: string; deadline: string | null; assignments?: TaskAssignmentMember[] }[]) => void
+  initDrafts: (
+    tasks: {
+      id: string
+      deadline: string | null
+      assignments?: TaskAssignmentMember[]
+    }[],
+  ) => void
   reset: () => void
 }
 
-const INITIAL: Omit<UiState, 'setUploadingTaskId' | 'setUploadError' | 'setDownloadingAttachmentId' | 'setUpdating' | 'setUpdateError' | 'setDeadlineDraft' | 'setTeamDraft' | 'updateTeamDraft' | 'setTeamError' | 'initDrafts' | 'reset'> = {
+const INITIAL: Omit<
+  UiState,
+  | 'setUploadingTaskId'
+  | 'setUploadError'
+  | 'setDownloadingAttachmentId'
+  | 'setUpdating'
+  | 'setUpdateError'
+  | 'setDeadlineDraft'
+  | 'setTeamDraft'
+  | 'updateTeamDraft'
+  | 'setTeamError'
+  | 'initDrafts'
+  | 'reset'
+> = {
   uploadingTaskId: null,
   uploadErrors: {},
   downloadingAttachmentId: null,
@@ -40,7 +62,8 @@ export const useUiStore = create<UiState>()((set) => ({
   setUploadingTaskId: (uploadingTaskId) => set({ uploadingTaskId }),
   setUploadError: (taskId, msg) =>
     set((s) => ({ uploadErrors: { ...s.uploadErrors, [taskId]: msg } })),
-  setDownloadingAttachmentId: (downloadingAttachmentId) => set({ downloadingAttachmentId }),
+  setDownloadingAttachmentId: (downloadingAttachmentId) =>
+    set({ downloadingAttachmentId }),
   setUpdating: (taskId, v) =>
     set((s) => ({ updatingTasks: { ...s.updatingTasks, [taskId]: v } })),
   setUpdateError: (taskId, msg) =>
@@ -51,7 +74,10 @@ export const useUiStore = create<UiState>()((set) => ({
     set((s) => ({ teamDrafts: { ...s.teamDrafts, [taskId]: draft } })),
   updateTeamDraft: (taskId, updater) =>
     set((s) => ({
-      teamDrafts: { ...s.teamDrafts, [taskId]: updater(s.teamDrafts[taskId] ?? []) },
+      teamDrafts: {
+        ...s.teamDrafts,
+        [taskId]: updater(s.teamDrafts[taskId] ?? []),
+      },
     })),
   setTeamError: (taskId, msg) =>
     set((s) => ({ teamErrors: { ...s.teamErrors, [taskId]: msg } })),

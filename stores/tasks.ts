@@ -17,7 +17,10 @@ interface TasksState {
   reset: () => void
 }
 
-const INITIAL: Pick<TasksState, 'tasks' | 'loading' | 'loadingMore' | 'nextCursor' | 'employees'> = {
+const INITIAL: Pick<
+  TasksState,
+  'tasks' | 'loading' | 'loadingMore' | 'nextCursor' | 'employees'
+> = {
   tasks: [],
   loading: true,
   loadingMore: false,

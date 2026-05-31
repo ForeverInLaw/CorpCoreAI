@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "npx prisma migrate deploy && next start",
     "lint": "eslint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "bot": "npx prisma migrate deploy && tsx scripts/bot.ts",
     "reminders": "npx prisma migrate deploy && tsx scripts/reminders.ts"
   },
@@ -44,6 +46,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "postcss": "8.5.10",
+    "prettier": "^3.8.3",
+    "prettier-plugin-tailwindcss": "^0.8.0",
     "prisma": "^7.0.1",
     "tailwindcss": "^4",
     "tsx": "^4.20.6",

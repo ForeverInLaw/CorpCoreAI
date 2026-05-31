@@ -32,14 +32,14 @@ Key points:
 
 ### {{Option A}}
 
-- Pros: {{List}}  
-- Cons: {{List}}  
+- Pros: {{List}}
+- Cons: {{List}}
 - Rejected because: {{Reason}}
 
 ### {{Option B}}
 
-- Pros: {{List}}  
-- Cons: {{List}}  
+- Pros: {{List}}
+- Cons: {{List}}
 - Rejected because: {{Reason}}
 
 ---
@@ -52,7 +52,7 @@ Key points:
 
 ### Negative / risks
 
-- {{Risk}}  
+- {{Risk}}
 - Mitigation: {{How to handle it}}
 
 ---
@@ -61,21 +61,21 @@ Key points:
 
 ### Code
 
-- Affected modules / services: {{List}}  
-- New boundaries / responsibilities: {{Description}}  
+- Affected modules / services: {{List}}
+- New boundaries / responsibilities: {{Description}}
 - Feature flags / toggles: {{Names, defaults, removal plan}}
 
 ### Data / configuration
 
-- Data model / schema changes: {{List or N/A}}  
-- Config changes: {{Keys, defaults, secrets handling}}  
+- Data model / schema changes: {{List or N/A}}
+- Config changes: {{Keys, defaults, secrets handling}}
 - Backwards compatibility: {{Strategy}}
 
 ### Documentation
 
-- Feature docs to update: {{Links}}  
-- Testing docs to update: {{Links}}  
-- Architecture docs to update: {{Links}}  
+- Feature docs to update: {{Links}}
+- Testing docs to update: {{Links}}
+- Architecture docs to update: {{Links}}
 - Notes for `AGENTS.md`: {{New rules or patterns}}
 
 ---
@@ -88,8 +88,8 @@ Key points:
 
 ### Test environment
 
-- Environment: {{Local compose / staging / prod-like}}  
-- Data and reset strategy: {{Seed data, migrations, rollback plan}}  
+- Environment: {{Local compose / staging / prod-like}}
+- Data and reset strategy: {{Seed data, migrations, rollback plan}}
 - External dependencies: {{Real / sandbox / fake services required}}
 
 ### Test commands
@@ -100,30 +100,30 @@ Key points:
 
 ### New or changed tests
 
-| ID | Scenario | Level (Unit / Int / API / UI) | Expected result | Notes / Data |
-| --- | --- | --- | --- | --- |
-| {{TST-001}} | {{Happy path / negative / edge}} | {{Integration}} | {{Observable outcome}} | {{Fixtures / seed data}} |
+| ID          | Scenario                         | Level (Unit / Int / API / UI) | Expected result        | Notes / Data             |
+| ----------- | -------------------------------- | ----------------------------- | ---------------------- | ------------------------ |
+| {{TST-001}} | {{Happy path / negative / edge}} | {{Integration}}               | {{Observable outcome}} | {{Fixtures / seed data}} |
 
 ### Regression and analysis
 
-- Regression suites to run: {{Which suites must stay green}}  
-- Static analysis: {{Tools / configs that must pass}}  
+- Regression suites to run: {{Which suites must stay green}}
+- Static analysis: {{Tools / configs that must pass}}
 - Monitoring during rollout: {{Logs / metrics / alerts to watch}}
 
 ---
 
 ## Rollout and migration
 
-- Migration steps: {{Steps}}  
-- Backwards compatibility: {{Strategy}}  
+- Migration steps: {{Steps}}
+- Backwards compatibility: {{Strategy}}
 - Rollback: {{How to revert}}
 
 ---
 
 ## References
 
-- Issues / tickets: {{Links}}  
-- External docs / specs: {{Links}}  
+- Issues / tickets: {{Links}}
+- External docs / specs: {{Links}}
 - Related ADRs: {{Links}}
 
 ---

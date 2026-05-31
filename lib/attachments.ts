@@ -2,7 +2,10 @@ import { AttachmentSource } from '@prisma/client'
 
 import { prisma } from './db'
 
-function detectExtension(fileName?: string | null, mimeType?: string | null): string | null {
+function detectExtension(
+  fileName?: string | null,
+  mimeType?: string | null,
+): string | null {
   if (fileName) {
     const match = /\.([a-zA-Z0-9]{1,8})$/.exec(fileName)
     if (match) {
@@ -14,11 +17,14 @@ function detectExtension(fileName?: string | null, mimeType?: string | null): st
     const lookup: Record<string, string> = {
       'application/pdf': 'pdf',
       'application/msword': 'doc',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+        'docx',
       'application/vnd.ms-excel': 'xls',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+        'xlsx',
       'application/vnd.ms-powerpoint': 'ppt',
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation':
+        'pptx',
       'image/jpeg': 'jpg',
       'image/png': 'png',
       'image/gif': 'gif',
@@ -34,7 +40,10 @@ function detectExtension(fileName?: string | null, mimeType?: string | null): st
   return null
 }
 
-export function formatAttachmentType(fileName?: string | null, mimeType?: string | null): string {
+export function formatAttachmentType(
+  fileName?: string | null,
+  mimeType?: string | null,
+): string {
   const ext = detectExtension(fileName, mimeType)
   return ext ? `FILE (.${ext.toUpperCase()})` : 'FILE'
 }
@@ -51,7 +60,9 @@ export type TelegramAttachmentPayload = {
   type?: string | null
 }
 
-export async function saveTelegramAttachment(payload: TelegramAttachmentPayload) {
+export async function saveTelegramAttachment(
+  payload: TelegramAttachmentPayload,
+) {
   const {
     taskId,
     uploadedById,
@@ -95,8 +106,19 @@ export type ExternalAttachmentPayload = {
   type?: string | null
 }
 
-export async function saveExternalAttachment(payload: ExternalAttachmentPayload) {
-  const { taskId, uploadedById, fileName, mimeType, sizeBytes, url, storagePath, type } = payload
+export async function saveExternalAttachment(
+  payload: ExternalAttachmentPayload,
+) {
+  const {
+    taskId,
+    uploadedById,
+    fileName,
+    mimeType,
+    sizeBytes,
+    url,
+    storagePath,
+    type,
+  } = payload
   const normalizedType = type ?? formatAttachmentType(fileName, mimeType)
 
   return prisma.attachment.create({

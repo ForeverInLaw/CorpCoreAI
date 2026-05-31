@@ -50,22 +50,22 @@ Provides a complete audit trail for task changes. Every significant modification
 
 ### Primary flows
 
-1. **View Task History**  
-   - Actor: User with task access  
-   - Trigger: Expand task card in UI  
-   - Steps: History loaded with task → Rendered in TaskHistoryLog component  
+1. **View Task History**
+   - Actor: User with task access
+   - Trigger: Expand task card in UI
+   - Steps: History loaded with task → Rendered in TaskHistoryLog component
    - Result: Chronological list of changes displayed
 
-2. **Log Status Change**  
-   - Actor: System (triggered by API/Bot)  
-   - Trigger: Task status updated  
-   - Steps: Create history entry with type=STATUS_CHANGE, details={from, to}  
+2. **Log Status Change**
+   - Actor: System (triggered by API/Bot)
+   - Trigger: Task status updated
+   - Steps: Create history entry with type=STATUS_CHANGE, details={from, to}
    - Result: Change permanently recorded
 
-3. **Log Team Change**  
-   - Actor: Manager  
-   - Trigger: Team members added/removed  
-   - Steps: Compare before/after → Log TEAM_CHANGE with member lists  
+3. **Log Team Change**
+   - Actor: Manager
+   - Trigger: Team members added/removed
+   - Steps: Compare before/after → Log TEAM_CHANGE with member lists
    - Result: Team modification history preserved
 
 ### Edge cases
@@ -78,13 +78,13 @@ Provides a complete audit trail for task changes. Every significant modification
 
 ## System Behaviour
 
-- Entry points: Internal function `logTaskHistory()` called by API/Bot handlers  
-- Reads from: TaskHistory table  
-- Writes to: TaskHistory table  
-- Side effects: None  
-- Idempotency: Not applicable (always creates new entry)  
-- Error handling: Errors logged, don't block main operation  
-- Security: History read access follows task access rules  
+- Entry points: Internal function `logTaskHistory()` called by API/Bot handlers
+- Reads from: TaskHistory table
+- Writes to: TaskHistory table
+- Side effects: None
+- Idempotency: Not applicable (always creates new entry)
+- Error handling: Errors logged, don't block main operation
+- Security: History read access follows task access rules
 - Observability: History entries themselves provide observability
 
 ---
@@ -95,7 +95,7 @@ Provides a complete audit trail for task changes. Every significant modification
 erDiagram
     Task ||--o{ TaskHistory : has
     User ||--o{ TaskHistory : actor
-    
+
     TaskHistory {
         int id PK
         int taskId FK
@@ -108,16 +108,16 @@ erDiagram
 
 ### History Entry Types
 
-| Type | Details Structure | Description |
-|------|-------------------|-------------|
-| STATUS_CHANGE | `{from: string, to: string}` | Task status changed |
-| DEADLINE_CHANGE | `{from: string\|null, to: string\|null}` | Deadline updated |
-| ASSIGNEE_CHANGE | `{fromId, fromName, toId, toName}` | Primary assignee changed |
-| TEAM_CHANGE | `{from: [{userId, name, isLead}], to: [...]}` | Team composition modified |
-| TAG_CHANGE | `{from: [tagId], to: [tagId]}` | Tags updated |
-| PROJECT_CHANGE | `{from: [projectId], to: [projectId]}` | Projects updated |
-| REVIEW_STATUS_CHANGE | `{from, to, action?, reason?}` | Completion review status changed |
-| OVERDUE_REASON | `{reason, previousDeadline, newDeadline}` | Overdue explanation provided |
+| Type                 | Details Structure                             | Description                      |
+| -------------------- | --------------------------------------------- | -------------------------------- |
+| STATUS_CHANGE        | `{from: string, to: string}`                  | Task status changed              |
+| DEADLINE_CHANGE      | `{from: string\|null, to: string\|null}`      | Deadline updated                 |
+| ASSIGNEE_CHANGE      | `{fromId, fromName, toId, toName}`            | Primary assignee changed         |
+| TEAM_CHANGE          | `{from: [{userId, name, isLead}], to: [...]}` | Team composition modified        |
+| TAG_CHANGE           | `{from: [tagId], to: [tagId]}`                | Tags updated                     |
+| PROJECT_CHANGE       | `{from: [projectId], to: [projectId]}`        | Projects updated                 |
+| REVIEW_STATUS_CHANGE | `{from, to, action?, reason?}`                | Completion review status changed |
+| OVERDUE_REASON       | `{reason, previousDeadline, newDeadline}`     | Overdue explanation provided     |
 
 ---
 
@@ -125,8 +125,8 @@ erDiagram
 
 ### Test environment
 
-- Environment: Local Docker with PostgreSQL  
-- Data: Tasks with various operations performed  
+- Environment: Local Docker with PostgreSQL
+- Data: Tasks with various operations performed
 - External dependencies: None
 
 ### Test commands
@@ -139,39 +139,39 @@ erDiagram
 
 **Positive scenarios**
 
-| ID | Description | Level | Expected result | Data / Notes |
-| --- | --- | --- | --- | --- |
-| POS-001 | Status change creates history | API | TaskHistory record with STATUS_CHANGE type | Valid status transition |
-| POS-002 | Multiple changes logged | API | Multiple history entries | Status + deadline change |
-| POS-003 | History in API response | API | task.history array with entries | GET /api/tasks |
+| ID      | Description                   | Level | Expected result                            | Data / Notes             |
+| ------- | ----------------------------- | ----- | ------------------------------------------ | ------------------------ |
+| POS-001 | Status change creates history | API   | TaskHistory record with STATUS_CHANGE type | Valid status transition  |
+| POS-002 | Multiple changes logged       | API   | Multiple history entries                   | Status + deadline change |
+| POS-003 | History in API response       | API   | task.history array with entries            | GET /api/tasks           |
 
 **Negative scenarios**
 
-| ID | Description | Level | Expected result | Data / Notes |
-| --- | --- | --- | --- | --- |
-| NEG-001 | No-op status change | API | No history entry | Same status value |
+| ID      | Description         | Level | Expected result  | Data / Notes      |
+| ------- | ------------------- | ----- | ---------------- | ----------------- |
+| NEG-001 | No-op status change | API   | No history entry | Same status value |
 
 **Edge cases**
 
-| ID | Description | Level | Expected result | Data / Notes |
-| --- | --- | --- | --- | --- |
-| EDGE-001 | System-triggered overdue | Integration | actorId = null | Reminder job |
-| EDGE-002 | 50+ history entries | API | Only latest 50 returned | Large history |
+| ID       | Description              | Level       | Expected result         | Data / Notes  |
+| -------- | ------------------------ | ----------- | ----------------------- | ------------- |
+| EDGE-001 | System-triggered overdue | Integration | actorId = null          | Reminder job  |
+| EDGE-002 | 50+ history entries      | API         | Only latest 50 returned | Large history |
 
 ### Test mapping
 
-- Integration tests: —  
-- API tests: Manual verification  
-- Unit tests: —  
+- Integration tests: —
+- API tests: Manual verification
+- Unit tests: —
 - Static analysis: ESLint
 
 ---
 
 ## Definition of Done
 
-- All change types create appropriate history entries  
-- History displays correctly in UI  
-- Actor attribution is accurate  
+- All change types create appropriate history entries
+- History displays correctly in UI
+- Actor attribution is accurate
 - No history leaks between tasks
 
 ---

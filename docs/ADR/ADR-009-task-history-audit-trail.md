@@ -116,10 +116,10 @@ Key points:
 
 ### New or changed tests
 
-| ID | Scenario | Level (Unit / Int / API / UI) | Expected result | Notes / Data |
-| --- | --- | --- | --- | --- |
-| TST-009-001 | Status change logs history | API | TaskHistory entry created | type=STATUS_CHANGE |
-| TST-009-002 | System action logs null actor | Integration | actorId null allowed | reminders overdue |
+| ID          | Scenario                      | Level (Unit / Int / API / UI) | Expected result           | Notes / Data       |
+| ----------- | ----------------------------- | ----------------------------- | ------------------------- | ------------------ |
+| TST-009-001 | Status change logs history    | API                           | TaskHistory entry created | type=STATUS_CHANGE |
+| TST-009-002 | System action logs null actor | Integration                   | actorId null allowed      | reminders overdue  |
 
 ---
 

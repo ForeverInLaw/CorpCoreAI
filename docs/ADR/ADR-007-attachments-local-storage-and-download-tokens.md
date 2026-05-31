@@ -127,11 +127,11 @@ Key points:
 
 ### New or changed tests
 
-| ID | Scenario | Level (Unit / Int / API / UI) | Expected result | Notes / Data |
-| --- | --- | --- | --- | --- |
-| TST-007-001 | Web upload creates Attachment | API | 200 + DB record + file on disk | multipart upload |
-| TST-007-002 | Token download consumes token | API | 200, then 404 on reuse | token reuse |
-| TST-007-003 | Expired token returns 410 | API | 410 Gone | wait > 5 min |
+| ID          | Scenario                      | Level (Unit / Int / API / UI) | Expected result                | Notes / Data     |
+| ----------- | ----------------------------- | ----------------------------- | ------------------------------ | ---------------- |
+| TST-007-001 | Web upload creates Attachment | API                           | 200 + DB record + file on disk | multipart upload |
+| TST-007-002 | Token download consumes token | API                           | 200, then 404 on reuse         | token reuse      |
+| TST-007-003 | Expired token returns 410     | API                           | 410 Gone                       | wait > 5 min     |
 
 ---
 

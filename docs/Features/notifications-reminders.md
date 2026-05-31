@@ -53,34 +53,34 @@ Keeps users informed about task updates and upcoming deadlines through Telegram 
 
 ### Primary flows
 
-1. **Status Change Notification**  
-   - Actor: System  
-   - Trigger: Task status updated  
-   - Steps: Identify recipients → Exclude actor → Send Telegram message to each  
+1. **Status Change Notification**
+   - Actor: System
+   - Trigger: Task status updated
+   - Steps: Identify recipients → Exclude actor → Send Telegram message to each
    - Result: Stakeholders informed of status change
 
-2. **Assignment Notification**  
-   - Actor: System  
-   - Trigger: Task assigned or reassigned  
-   - Steps: Notify new assignee → Notify previous assignee (if any)  
+2. **Assignment Notification**
+   - Actor: System
+   - Trigger: Task assigned or reassigned
+   - Steps: Notify new assignee → Notify previous assignee (if any)
    - Result: Assignees know their task assignments
 
-3. **Team Change Notification**  
-   - Actor: System  
-   - Trigger: Team members added/removed  
-   - Steps: Notify added members → Notify removed members → Notify remaining team  
+3. **Team Change Notification**
+   - Actor: System
+   - Trigger: Team members added/removed
+   - Steps: Notify added members → Notify removed members → Notify remaining team
    - Result: All team members aware of composition changes
 
-4. **Daily Reminder (Scheduled Job)**  
-   - Actor: Scheduled script  
-   - Trigger: Cron job execution  
-   - Steps: Query active tasks → Filter by last reminder date → Send reminder → Update flag  
+4. **Daily Reminder (Scheduled Job)**
+   - Actor: Scheduled script
+   - Trigger: Cron job execution
+   - Steps: Query active tasks → Filter by last reminder date → Send reminder → Update flag
    - Result: Assignees reminded of ongoing tasks
 
-5. **Overdue Detection (Scheduled Job)**  
-   - Actor: Scheduled script  
-   - Trigger: Cron job execution  
-   - Steps: Find tasks past deadline → Set OVERDUE status → Notify assignee → Notify manager  
+5. **Overdue Detection (Scheduled Job)**
+   - Actor: Scheduled script
+   - Trigger: Cron job execution
+   - Steps: Find tasks past deadline → Set OVERDUE status → Notify assignee → Notify manager
    - Result: Overdue tasks flagged and relevant parties notified
 
 ### Edge cases
@@ -93,25 +93,25 @@ Keeps users informed about task updates and upcoming deadlines through Telegram 
 
 ## System Behaviour
 
-- Entry points:  
-  - Real-time: `broadcastTaskNotification()`, `sendTelegramNotification()` in lib/bot  
-  - Scheduled: `scripts/reminders.ts` (run via cron)  
-- Reads from: Task, User tables  
-- Writes to: Task (reminder tracking fields)  
-- Side effects: Telegram API calls  
-- Idempotency: Scheduled reminders use date flags to prevent duplicates  
-- Error handling: Try-catch with console logging, failures don't propagate  
+- Entry points:
+  - Real-time: `broadcastTaskNotification()`, `sendTelegramNotification()` in lib/bot
+  - Scheduled: `scripts/reminders.ts` (run via cron)
+- Reads from: Task, User tables
+- Writes to: Task (reminder tracking fields)
+- Side effects: Telegram API calls
+- Idempotency: Scheduled reminders use date flags to prevent duplicates
+- Error handling: Try-catch with console logging, failures don't propagate
 - Observability: Console error logs for failed sends
 
 ### Reminder Tracking Fields (on Task)
 
-| Field | Purpose |
-|-------|---------|
-| lastDailyReminderAt | Last daily reminder sent |
-| lastDeadlineReminderAt | "1 day before" reminder sent |
-| deadlineDayNotifiedAt | Deadline day notification sent |
-| overdueNotifiedAt | Overdue notification to assignee sent |
-| managerOverdueNotifiedAt | Overdue notification to manager sent |
+| Field                    | Purpose                               |
+| ------------------------ | ------------------------------------- |
+| lastDailyReminderAt      | Last daily reminder sent              |
+| lastDeadlineReminderAt   | "1 day before" reminder sent          |
+| deadlineDayNotifiedAt    | Deadline day notification sent        |
+| overdueNotifiedAt        | Overdue notification to assignee sent |
+| managerOverdueNotifiedAt | Overdue notification to manager sent  |
 
 ---
 
@@ -129,7 +129,7 @@ flowchart TD
         E --> F
         F --> G[Send Telegram Message]
     end
-    
+
     subgraph Scheduled Reminders
         H[Cron Job] --> I[Query Active Tasks]
         I --> J{Check Deadline}
@@ -147,8 +147,8 @@ flowchart TD
 
 ### Test environment
 
-- Environment: Local with BOT_TOKEN  
-- Data: Tasks with various deadlines  
+- Environment: Local with BOT_TOKEN
+- Data: Tasks with various deadlines
 - External dependencies: Telegram Bot API
 
 ### Test commands
@@ -161,41 +161,41 @@ flowchart TD
 
 **Positive scenarios**
 
-| ID | Description | Level | Expected result | Data / Notes |
-| --- | --- | --- | --- | --- |
-| POS-001 | Status change notification | Integration | Message sent to stakeholders | Status update |
-| POS-002 | Assignment notification | Integration | New assignee receives message | Reassignment |
-| POS-003 | Overdue detection | Integration | Status → OVERDUE, notifications sent | Past deadline task |
-| POS-004 | Deadline warning | Integration | Message sent 1 day before | Upcoming deadline |
+| ID      | Description                | Level       | Expected result                      | Data / Notes       |
+| ------- | -------------------------- | ----------- | ------------------------------------ | ------------------ |
+| POS-001 | Status change notification | Integration | Message sent to stakeholders         | Status update      |
+| POS-002 | Assignment notification    | Integration | New assignee receives message        | Reassignment       |
+| POS-003 | Overdue detection          | Integration | Status → OVERDUE, notifications sent | Past deadline task |
+| POS-004 | Deadline warning           | Integration | Message sent 1 day before            | Upcoming deadline  |
 
 **Negative scenarios**
 
-| ID | Description | Level | Expected result | Data / Notes |
-| --- | --- | --- | --- | --- |
+| ID      | Description     | Level       | Expected result             | Data / Notes |
+| ------- | --------------- | ----------- | --------------------------- | ------------ |
 | NEG-001 | User blocks bot | Integration | Notification fails silently | Blocked user |
-| NEG-002 | Invalid user ID | Integration | Error logged, no crash | Deleted user |
+| NEG-002 | Invalid user ID | Integration | Error logged, no crash      | Deleted user |
 
 **Edge cases**
 
-| ID | Description | Level | Expected result | Data / Notes |
-| --- | --- | --- | --- | --- |
-| EDGE-001 | Actor excluded | Integration | No self-notification | User changes own task |
-| EDGE-002 | Duplicate reminder prevention | Integration | Only one per day | Multiple job runs |
-| EDGE-003 | New deadline clears flags | API | Reminder flags reset | Deadline update |
+| ID       | Description                   | Level       | Expected result      | Data / Notes          |
+| -------- | ----------------------------- | ----------- | -------------------- | --------------------- |
+| EDGE-001 | Actor excluded                | Integration | No self-notification | User changes own task |
+| EDGE-002 | Duplicate reminder prevention | Integration | Only one per day     | Multiple job runs     |
+| EDGE-003 | New deadline clears flags     | API         | Reminder flags reset | Deadline update       |
 
 ### Test mapping
 
-- Integration tests: Manual Telegram verification  
-- Unit tests: —  
+- Integration tests: Manual Telegram verification
+- Unit tests: —
 - Static analysis: ESLint
 
 ---
 
 ## Definition of Done
 
-- Real-time notifications sent on all task changes  
-- Scheduled reminders run reliably  
-- No duplicate notifications  
+- Real-time notifications sent on all task changes
+- Scheduled reminders run reliably
+- No duplicate notifications
 - Failures don't block main operations
 
 ---

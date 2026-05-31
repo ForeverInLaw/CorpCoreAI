@@ -46,23 +46,24 @@ Provides secure authentication using Telegram's WebApp authentication mechanism 
 
 ### Role Permissions
 
-| Permission | EMPLOYEE | MANAGER |
-|------------|----------|---------|
-| View own tasks | ✅ | ✅ |
-| View all tasks | ❌ | ✅ |
-| Create tasks | ✅ | ✅ |
-| Update own task status | ✅ | ✅ |
-| Set status to CLOSED | ❌ | ✅ |
-| Reassign tasks | ❌ | ✅ |
-| Update tags/projects | ❌ | ✅ |
-| Manage team | ❌ | ✅ |
-| Approve/reject completion | ❌ | ✅ |
-| Remove deadlines | ❌ | ✅ |
-| Set past deadlines | ❌ | ✅ |
+| Permission                | EMPLOYEE | MANAGER |
+| ------------------------- | -------- | ------- |
+| View own tasks            | ✅       | ✅      |
+| View all tasks            | ❌       | ✅      |
+| Create tasks              | ✅       | ✅      |
+| Update own task status    | ✅       | ✅      |
+| Set status to CLOSED      | ❌       | ✅      |
+| Reassign tasks            | ❌       | ✅      |
+| Update tags/projects      | ❌       | ✅      |
+| Manage team               | ❌       | ✅      |
+| Approve/reject completion | ❌       | ✅      |
+| Remove deadlines          | ❌       | ✅      |
+| Set past deadlines        | ❌       | ✅      |
 
 ### Task Access Rules
 
 A user can access a task if:
+
 - User is MANAGER (full access to all tasks), OR
 - User is the task creator, OR
 - User is the task assignee, OR
@@ -74,28 +75,28 @@ A user can access a task if:
 
 ### Primary flows
 
-1. **WebApp Authentication**  
-   - Actor: User opening Telegram WebApp  
-   - Trigger: API request with Authorization header  
-   - Steps: Extract initData → Validate with BOT_TOKEN → Parse user info → Check whitelist → Create/update user → Return user context  
+1. **WebApp Authentication**
+   - Actor: User opening Telegram WebApp
+   - Trigger: API request with Authorization header
+   - Steps: Extract initData → Validate with BOT_TOKEN → Parse user info → Check whitelist → Create/update user → Return user context
    - Result: Authenticated request proceeds or 401/403 returned
 
-2. **Bot Authentication**  
-   - Actor: User sending message to bot  
-   - Trigger: Any bot message/callback  
-   - Steps: Middleware extracts ctx.from.id → Check whitelist → Create/update user → Attach to context  
+2. **Bot Authentication**
+   - Actor: User sending message to bot
+   - Trigger: Any bot message/callback
+   - Steps: Middleware extracts ctx.from.id → Check whitelist → Create/update user → Attach to context
    - Result: User attached to bot context or "Доступ запрещен" message
 
-3. **Role Resolution**  
-   - Actor: System  
-   - Trigger: User authentication  
-   - Steps: Check if Telegram ID in MANAGER_IDS → Assign MANAGER or EMPLOYEE  
+3. **Role Resolution**
+   - Actor: System
+   - Trigger: User authentication
+   - Steps: Check if Telegram ID in MANAGER_IDS → Assign MANAGER or EMPLOYEE
    - Result: Role stored in database and available for authorization
 
-4. **Task Access Check**  
-   - Actor: System  
-   - Trigger: Task-related API/bot operation  
-   - Steps: Fetch task with relations → Check user role → Check ownership/assignment → Allow or deny  
+4. **Task Access Check**
+   - Actor: System
+   - Trigger: Task-related API/bot operation
+   - Steps: Fetch task with relations → Check user role → Check ownership/assignment → Allow or deny
    - Result: Operation proceeds or 403 returned
 
 ### Edge cases
@@ -109,16 +110,16 @@ A user can access a task if:
 
 ## System Behaviour
 
-- Entry points:  
+- Entry points:
   - `lib/auth.ts` (WebApp validation)
   - `lib/users.ts` (user management, whitelist)
   - Bot middleware in `lib/bot/index.ts`
-- Reads from: Environment variables (WHITELIST, MANAGER_IDS, BOT_TOKEN), User table  
-- Writes to: User table (create/update)  
-- Side effects: None  
-- Idempotency: Yes (same user info = no DB change)  
-- Error handling: Returns appropriate HTTP status codes  
-- Security:  
+- Reads from: Environment variables (WHITELIST, MANAGER_IDS, BOT_TOKEN), User table
+- Writes to: User table (create/update)
+- Side effects: None
+- Idempotency: Yes (same user info = no DB change)
+- Error handling: Returns appropriate HTTP status codes
+- Security:
   - HMAC validation of Telegram initData
   - 1-hour expiration window
   - Whitelist enforcement
@@ -165,8 +166,8 @@ flowchart TD
 
 ### Test environment
 
-- Environment: Local with BOT_TOKEN, WHITELIST, MANAGER_IDS configured  
-- Data: Test Telegram users  
+- Environment: Local with BOT_TOKEN, WHITELIST, MANAGER_IDS configured
+- Data: Test Telegram users
 - External dependencies: Telegram Bot API (for initData validation)
 
 ### Test commands
@@ -179,42 +180,42 @@ flowchart TD
 
 **Positive scenarios**
 
-| ID | Description | Level | Expected result | Data / Notes |
-| --- | --- | --- | --- | --- |
-| POS-001 | Valid whitelisted user | API | 200 with user data | Valid initData |
-| POS-002 | Manager role assigned | API | user.role = MANAGER | User in MANAGER_IDS |
-| POS-003 | User auto-created | API | User record in DB | First-time whitelisted user |
+| ID      | Description            | Level | Expected result     | Data / Notes                |
+| ------- | ---------------------- | ----- | ------------------- | --------------------------- |
+| POS-001 | Valid whitelisted user | API   | 200 with user data  | Valid initData              |
+| POS-002 | Manager role assigned  | API   | user.role = MANAGER | User in MANAGER_IDS         |
+| POS-003 | User auto-created      | API   | User record in DB   | First-time whitelisted user |
 
 **Negative scenarios**
 
-| ID | Description | Level | Expected result | Data / Notes |
-| --- | --- | --- | --- | --- |
-| NEG-001 | Missing auth header | API | 401 Unauthorized | No Authorization |
-| NEG-002 | Non-whitelisted user | API | 403 Access denied | Unknown Telegram ID |
-| NEG-003 | Expired initData | API | 403 Invalid initData | > 1 hour old |
-| NEG-004 | Invalid HMAC | API | 403 Invalid initData | Tampered data |
+| ID      | Description          | Level | Expected result      | Data / Notes        |
+| ------- | -------------------- | ----- | -------------------- | ------------------- |
+| NEG-001 | Missing auth header  | API   | 401 Unauthorized     | No Authorization    |
+| NEG-002 | Non-whitelisted user | API   | 403 Access denied    | Unknown Telegram ID |
+| NEG-003 | Expired initData     | API   | 403 Invalid initData | > 1 hour old        |
+| NEG-004 | Invalid HMAC         | API   | 403 Invalid initData | Tampered data       |
 
 **Edge cases**
 
-| ID | Description | Level | Expected result | Data / Notes |
-| --- | --- | --- | --- | --- |
-| EDGE-001 | Role change mid-session | API | New role on next request | Env var update |
-| EDGE-002 | Name update from Telegram | API | Name synced in DB | Changed Telegram name |
+| ID       | Description               | Level | Expected result          | Data / Notes          |
+| -------- | ------------------------- | ----- | ------------------------ | --------------------- |
+| EDGE-001 | Role change mid-session   | API   | New role on next request | Env var update        |
+| EDGE-002 | Name update from Telegram | API   | Name synced in DB        | Changed Telegram name |
 
 ### Test mapping
 
-- Integration tests: —  
-- API tests: Manual HTTP testing  
-- Unit tests: —  
+- Integration tests: —
+- API tests: Manual HTTP testing
+- Unit tests: —
 - Static analysis: ESLint
 
 ---
 
 ## Definition of Done
 
-- Telegram initData properly validated  
-- Whitelist enforced on all endpoints  
-- Roles correctly assigned from env vars  
+- Telegram initData properly validated
+- Whitelist enforced on all endpoints
+- Roles correctly assigned from env vars
 - Task access rules consistently applied
 
 ---

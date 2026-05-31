@@ -124,12 +124,12 @@ Key points:
 
 ### New or changed tests
 
-| ID | Scenario | Level (Unit / Int / API / UI) | Expected result | Notes / Data |
-| --- | --- | --- | --- | --- |
-| TST-001 | Valid initData | API | 200 response | Real Telegram session |
-| TST-002 | Invalid initData | API | 403 Forbidden | Tampered data |
-| TST-003 | Missing header | API | 401 Unauthorized | No Authorization |
-| TST-004 | Non-whitelisted user | API | 403 Access denied | Valid but not in whitelist |
+| ID      | Scenario             | Level (Unit / Int / API / UI) | Expected result   | Notes / Data               |
+| ------- | -------------------- | ----------------------------- | ----------------- | -------------------------- |
+| TST-001 | Valid initData       | API                           | 200 response      | Real Telegram session      |
+| TST-002 | Invalid initData     | API                           | 403 Forbidden     | Tampered data              |
+| TST-003 | Missing header       | API                           | 401 Unauthorized  | No Authorization           |
+| TST-004 | Non-whitelisted user | API                           | 403 Access denied | Valid but not in whitelist |
 
 ### Regression and analysis
 

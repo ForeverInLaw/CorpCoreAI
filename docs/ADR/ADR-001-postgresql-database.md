@@ -119,10 +119,10 @@ Key points:
 
 ### New or changed tests
 
-| ID | Scenario | Level (Unit / Int / API / UI) | Expected result | Notes / Data |
-| --- | --- | --- | --- | --- |
-| TST-001 | Task CRUD operations | Integration | Tasks persist and retrieve correctly | Seed data |
-| TST-002 | Concurrent access | Integration | No data corruption | Multiple connections |
+| ID      | Scenario             | Level (Unit / Int / API / UI) | Expected result                      | Notes / Data         |
+| ------- | -------------------- | ----------------------------- | ------------------------------------ | -------------------- |
+| TST-001 | Task CRUD operations | Integration                   | Tasks persist and retrieve correctly | Seed data            |
+| TST-002 | Concurrent access    | Integration                   | No data corruption                   | Multiple connections |
 
 ### Regression and analysis
 

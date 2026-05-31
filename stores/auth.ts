@@ -11,7 +11,10 @@ interface AuthState {
   reset: () => void
 }
 
-const INITIAL: Pick<AuthState, 'isAuthorized' | 'currentUser' | 'accessDenied'> = {
+const INITIAL: Pick<
+  AuthState,
+  'isAuthorized' | 'currentUser' | 'accessDenied'
+> = {
   isAuthorized: false,
   currentUser: null,
   accessDenied: false,

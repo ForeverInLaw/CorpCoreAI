@@ -1,5 +1,5 @@
-@import "tailwindcss";
-@import "tw-animate-css";
+@import 'tailwindcss';
+@import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -47,34 +47,34 @@
   /* Zinc-like palette for a premium studio feel */
   --background: oklch(1 0 0); /* White */
   --foreground: oklch(0.13 0.02 260); /* Deep Zinc */
-  
+
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.13 0.02 260);
-  
+
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.13 0.02 260);
-  
+
   --primary: oklch(0.13 0.02 260); /* Almost Black */
   --primary-foreground: oklch(0.98 0 0); /* White */
-  
+
   --secondary: oklch(0.96 0.01 260); /* Light Zinc */
   --secondary-foreground: oklch(0.13 0.02 260);
-  
+
   --muted: oklch(0.96 0.01 260);
   --muted-foreground: oklch(0.55 0.02 260); /* Mid Zinc */
-  
+
   --accent: oklch(0.94 0.01 260);
   --accent-foreground: oklch(0.13 0.02 260);
-  
+
   --destructive: oklch(0.58 0.2 25); /* Refined Red */
   --destructive-foreground: oklch(0.98 0 0);
-  
+
   --border: oklch(0.92 0.01 260);
   --input: oklch(0.92 0.01 260);
   --ring: oklch(0.7 0.02 260);
-  
+
   --radius: 0.5rem; /* Slightly sharper for professional look */
-  
+
   /* Sidebar & Charts kept neutral/zinc */
   --sidebar: oklch(0.98 0 0);
   --sidebar-foreground: oklch(0.13 0.02 260);
@@ -91,10 +91,15 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground antialiased selection:bg-primary/20;
+    @apply bg-background text-foreground selection:bg-primary/20 antialiased;
   }
-  h1, h2, h3, h4, h5, h6 {
-    @apply tracking-tight font-semibold;
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-semibold tracking-tight;
   }
 }
 

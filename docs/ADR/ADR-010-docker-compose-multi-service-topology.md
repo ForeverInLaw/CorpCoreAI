@@ -117,9 +117,9 @@ Key points:
 
 ### New or changed tests
 
-| ID | Scenario | Level (Unit / Int / API / UI) | Expected result | Notes / Data |
-| --- | --- | --- | --- | --- |
-| TST-010-001 | Compose startup order | Integration | app waits for migrate | docker-compose up |
+| ID          | Scenario              | Level (Unit / Int / API / UI) | Expected result       | Notes / Data      |
+| ----------- | --------------------- | ----------------------------- | --------------------- | ----------------- |
+| TST-010-001 | Compose startup order | Integration                   | app waits for migrate | docker-compose up |
 
 ---
 

@@ -126,12 +126,12 @@ Key points:
 
 ### New or changed tests
 
-| ID | Scenario | Level (Unit / Int / API / UI) | Expected result | Notes / Data |
-| --- | --- | --- | --- | --- |
-| TST-001 | /start command | Integration | Welcome message sent | Bot running |
-| TST-002 | Task text parsing | Integration | AI parses, task created | Valid text input |
-| TST-003 | Whitelist check | Integration | Non-whitelisted denied | User not in list |
-| TST-004 | Status change callback | Integration | Task status updated | Valid callback data |
+| ID      | Scenario               | Level (Unit / Int / API / UI) | Expected result         | Notes / Data        |
+| ------- | ---------------------- | ----------------------------- | ----------------------- | ------------------- |
+| TST-001 | /start command         | Integration                   | Welcome message sent    | Bot running         |
+| TST-002 | Task text parsing      | Integration                   | AI parses, task created | Valid text input    |
+| TST-003 | Whitelist check        | Integration                   | Non-whitelisted denied  | User not in list    |
+| TST-004 | Status change callback | Integration                   | Task status updated     | Valid callback data |
 
 ### Regression and analysis
 

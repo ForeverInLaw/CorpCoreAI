@@ -6,7 +6,7 @@ services:
       target: runner
     restart: always
     ports:
-      - "127.0.0.1:3005:3000"
+      - '127.0.0.1:3005:3000'
     env_file:
       - .env
     environment:
@@ -36,8 +36,8 @@ services:
       target: bot
     restart: always
     command:
-      - "/bin/sh"
-      - "-c"
+      - '/bin/sh'
+      - '-c'
       - |-
         npx tsx scripts/reminders.ts || echo "[reminders] Initial job failed; will try again at next schedule";
         while true; do
@@ -64,8 +64,13 @@ services:
       context: .
       dockerfile: Dockerfile
       target: runner
-    command: ["node", "-e", "require('child_process').execSync('npx prisma migrate deploy', {stdio:'inherit'})"]
-    restart: "no"
+    command:
+      [
+        'node',
+        '-e',
+        "require('child_process').execSync('npx prisma migrate deploy', {stdio:'inherit'})",
+      ]
+    restart: 'no'
     env_file:
       - .env
     environment:
@@ -82,7 +87,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: corpcoreai
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 5s
       timeout: 5s
       retries: 10
