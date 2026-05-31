@@ -1,6 +1,6 @@
 ## Overview
 
-CorpCore AI combines Telegram bot flows with a Telegram WebApp (Next.js) UI. The bot accepts natural-language task descriptions, generates titling/subtasks via NVIDIA Minimax, stores tasks in Postgres (Prisma), and the WebApp renders them with role-specific access. A background reminder job notifies assignees/managers about upcoming or overdue deadlines.
+CorpCore AI combines Telegram bot flows with a Telegram WebApp (Next.js) UI. The bot accepts natural-language task descriptions, generates titling/subtasks via LLM (OpenAI-compatible or NVIDIA), stores tasks in Postgres (Prisma), and the WebApp renders them with role-specific access. A background reminder job notifies assignees/managers about upcoming or overdue deadlines.
 
 ## Getting Started
 
@@ -22,9 +22,17 @@ Required (see `.env.example`):
 | `DATABASE_URL`      | PostgreSQL connection string                                        |
 | `POSTGRES_PASSWORD` | Used by `docker-compose.yml` to set the Postgres container password |
 | `BOT_TOKEN`         | Telegram bot token from @BotFather                                  |
-| `NVIDIA_API_KEY`    | NVIDIA Minimax API key                                              |
 | `WHITELIST`         | Comma-separated Telegram user IDs allowed to access the app         |
 | `MANAGER_IDS`       | Comma-separated Telegram user IDs with manager role                 |
+
+LLM — one of the two options:
+
+| Variable          | Description                                                                   |
+| ----------------- | ----------------------------------------------------------------------------- |
+| `LLM_API_KEY`     | API key for any OpenAI-compatible provider (OpenAI, Anthropic proxy, Ollama, etc.) |
+| `LLM_BASE_URL`    | Base URL (default: `https://api.openai.com/v1`)                               |
+| `LLM_MODEL`       | Model name (default: `gpt-4o-mini`)                                           |
+| `NVIDIA_API_KEY`  | NVIDIA Minimax API key — used as fallback if `LLM_API_KEY` is not set         |
 
 ### Scripts
 

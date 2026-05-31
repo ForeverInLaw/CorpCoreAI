@@ -1,19 +1,40 @@
 import OpenAI from 'openai'
 
-if (!process.env.NVIDIA_API_KEY) {
-  throw new Error('NVIDIA_API_KEY is not defined')
-}
-
-const openai = new OpenAI({
-  apiKey: process.env.NVIDIA_API_KEY,
-  baseURL: 'https://integrate.api.nvidia.com/v1',
-})
-
-const THINK_TAG_PATTERN = /<think>[\s\S]*?<\/think>/gi
 const MAX_PARSE_TASK_ATTEMPTS = 2
 
+function createLlmClient(): { client: OpenAI; model: string } {
+  const apiKey = process.env.LLM_API_KEY ?? process.env.NVIDIA_API_KEY
+
+  if (!apiKey) {
+    throw new Error('LLM_API_KEY or NVIDIA_API_KEY must be defined')
+  }
+
+  const isNvidiaNative =
+    !process.env.LLM_API_KEY && !!process.env.NVIDIA_API_KEY
+
+  const baseURL = process.env.LLM_BASE_URL
+    ?? (isNvidiaNative
+      ? 'https://integrate.api.nvidia.com/v1'
+      : 'https://api.openai.com/v1')
+
+  const model = process.env.LLM_MODEL
+    ?? (isNvidiaNative ? 'minimaxai/minimax-m2' : 'gpt-4o-mini')
+
+  const client = new OpenAI({ apiKey, baseURL })
+  return { client, model }
+}
+
+const { client: openai, model: LLM_MODEL } = createLlmClient()
+
+function stripThinkBlocks(raw: string): string {
+  return raw
+    .replaceAll(/<think>[\s\S]*?<\/think>/gi, '')
+    .replaceAll(/<think>[\s\S]*$/gi, '')
+    .trim()
+}
+
 function extractJsonObject(raw: string) {
-  let cleaned = raw.replaceAll(THINK_TAG_PATTERN, '').trim()
+  let cleaned = stripThinkBlocks(raw)
 
   if (cleaned.startsWith('```')) {
     cleaned = cleaned
@@ -60,7 +81,7 @@ export async function parseTask(
   for (let attempt = 1; attempt <= MAX_PARSE_TASK_ATTEMPTS; attempt++) {
     try {
       const completion = await openai.chat.completions.create({
-        model: 'minimaxai/minimax-m2',
+        model: LLM_MODEL,
         messages: [
           {
             role: 'system',
