@@ -1857,8 +1857,9 @@ bot.on('message:photo', async (ctx) => {
 
 bot.on('message:voice', async (ctx) => {
   try {
-    const fileLink = await ctx.getFileLink()
-    const res = await fetch(fileLink.url)
+    const file = await ctx.getFile()
+    const url = `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${file.file_path}`
+    const res = await fetch(url)
     if (!res.ok) throw new Error(`Failed to download voice: ${res.status}`)
     const buffer = Buffer.from(await res.arrayBuffer())
 
