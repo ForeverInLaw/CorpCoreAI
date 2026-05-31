@@ -8,6 +8,7 @@ overrides:
 allowBuilds:
   '@prisma/engines': true
   prisma: true
+  protobufjs: true
   esbuild: false
   sharp: false
   unrs-resolver: false
