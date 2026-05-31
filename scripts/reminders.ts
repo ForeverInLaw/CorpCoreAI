@@ -166,7 +166,11 @@ async function runReminderJob() {
   })) as TaskWithRelations[]
 
   for (const task of tasks) {
-    await processTask(task, todayUtc)
+    try {
+      await processTask(task, todayUtc)
+    } catch (error) {
+      console.error(`Failed to process reminder for task ${task.id}:`, error)
+    }
   }
 }
 
