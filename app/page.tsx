@@ -44,6 +44,7 @@ export default function Home() {
     employees,
     setTasks,
     appendTasks,
+    addAttachment,
     setLoading,
     setLoadingMore,
     setNextCursor,
@@ -198,14 +199,17 @@ export default function Home() {
         })
 
         if (!response.ok) throw new Error('Upload failed')
-        await fetchTasks(telegramInitDataRef.current)
+        const { attachment } = (await response.json()) as {
+          attachment: Attachment
+        }
+        addAttachment(taskId, attachment)
       } catch {
         ui.setUploadError(taskId, 'Ошибка загрузки')
       } finally {
         ui.setUploadingTaskId(null)
       }
     },
-    [fetchTasks, ui],
+    [addAttachment, ui],
   )
 
   const requestDownloadUrl = useCallback(async (attachmentId: string) => {
