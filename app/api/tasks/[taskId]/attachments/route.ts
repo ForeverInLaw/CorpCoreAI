@@ -75,18 +75,18 @@ export async function POST(request: Request, context: { params: Promise<{ taskId
     return NextResponse.json({ error: 'Invalid initData' }, { status: 403 })
   }
 
-  const numericUserId = Number(userPayload.user?.id)
-  if (!numericUserId || Number.isNaN(numericUserId)) {
+  const userId = userPayload.user?.id
+  if (!userId) {
     return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 })
   }
 
-  if (!isWhitelistedTelegramId(numericUserId)) {
+  if (!isWhitelistedTelegramId(userId)) {
     return NextResponse.json({ error: 'Access denied' }, { status: 403 })
   }
 
   try {
     const telegramUser = await ensureTelegramUser({
-      id: numericUserId,
+      id: userId,
       name: userPayload.user?.first_name,
     })
 

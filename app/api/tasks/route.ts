@@ -23,19 +23,13 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'User ID missing in initData' }, { status: 400 })
     }
 
-    const numericUserId = Number(userId)
-
-    if (Number.isNaN(numericUserId)) {
-        return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 })
-    }
-
-    if (!isWhitelistedTelegramId(numericUserId)) {
+    if (!isWhitelistedTelegramId(userId)) {
         return NextResponse.json({ error: 'Access denied' }, { status: 403 })
     }
 
     try {
         const telegramUser = await ensureTelegramUser({
-            id: numericUserId,
+            id: userId,
             name: user.user?.first_name,
         })
 

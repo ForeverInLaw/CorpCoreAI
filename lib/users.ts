@@ -6,8 +6,6 @@ const managerIds = new Set(
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean)
-    .map(Number)
-    .filter((value) => !Number.isNaN(value))
 )
 
 const whitelistIds = new Set(
@@ -15,23 +13,21 @@ const whitelistIds = new Set(
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean)
-    .map(Number)
-    .filter((value) => !Number.isNaN(value))
 )
 
-export function isWhitelistedTelegramId(userId: number): boolean {
-  return whitelistIds.has(userId)
+export function isWhitelistedTelegramId(userId: string | bigint): boolean {
+  return whitelistIds.has(String(userId))
 }
 
-export function resolveRoleForTelegramId(userId: number): Role {
-  return managerIds.has(userId) ? 'MANAGER' : 'EMPLOYEE'
+export function resolveRoleForTelegramId(userId: string | bigint): Role {
+  return managerIds.has(String(userId)) ? 'MANAGER' : 'EMPLOYEE'
 }
 
 export async function ensureTelegramUser({
   id,
   name,
 }: {
-  id: number
+  id: string | bigint
   name?: string | null
 }): Promise<User> {
   const targetRole = resolveRoleForTelegramId(id)
