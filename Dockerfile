@@ -20,7 +20,6 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
@@ -28,7 +27,8 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN npx prisma generate && \
+    addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 
 EXPOSE 4174
@@ -45,14 +45,14 @@ RUN pnpm install --prod
 FROM base AS bot
 WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=bot-deps /app/node_modules ./node_modules
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/lib ./lib
 COPY --from=builder /app/proto ./proto
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN npx prisma generate && \
+    addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 
 CMD ["npx", "tsx", "scripts/bot.ts"]
