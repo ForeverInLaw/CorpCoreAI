@@ -27,27 +27,29 @@ export async function createDownloadToken(attachmentId: number, ttlMs = DOWNLOAD
 export async function consumeDownloadToken(token: string): Promise<{ record: DownloadTokenRecord | null; expired: boolean }> {
   const now = new Date()
 
-  const record = (await prisma.downloadToken.findUnique({
-    where: { token },
-    include: {
-      attachment: {
-        include: {
-          task: {
-            select: {
-              creatorId: true,
-              assigneeId: true,
+  let record: DownloadTokenRecord
+  try {
+    record = (await prisma.downloadToken.delete({
+      where: { token },
+      include: {
+        attachment: {
+          include: {
+            task: {
+              select: {
+                creatorId: true,
+                assigneeId: true,
+              },
             },
           },
         },
       },
-    },
-  })) as DownloadTokenRecord | null
-
-  if (!record) {
-    return { record: null, expired: false }
+    })) as DownloadTokenRecord
+  } catch (e: unknown) {
+    if (typeof e === 'object' && e !== null && 'code' in e && (e as { code: string }).code === 'P2025') {
+      return { record: null, expired: false }
+    }
+    throw e
   }
-
-  await prisma.downloadToken.delete({ where: { token } })
 
   const expired = record.expiresAt.getTime() <= now.getTime()
   return { record, expired }
