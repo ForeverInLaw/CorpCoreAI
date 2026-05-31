@@ -81,6 +81,14 @@ const pendingTaskDeadlineAdjustments = new Map<
     { taskId: number; stage: 'reason' | 'deadline'; reason?: string; initiatedByManager: boolean }
 >()
 
+const MAPS_TTL_MS = 30 * 60 * 1000
+setInterval(() => {
+    pendingManagerTasks.clear()
+    pendingDeadlineRequests.clear()
+    pendingAttachmentUploads.clear()
+    pendingTaskDeadlineAdjustments.clear()
+}, MAPS_TTL_MS)
+
 const mainKeyboard = new Keyboard().text('Мои задачи').row().text('Прикрепить файл').resized()
 const TASKS_PAGE_SIZE = 10
 const ATTACHABLE_STATUSES: TaskStatus[] = ['IN_PROGRESS', 'PAUSED', 'OVERDUE']
