@@ -6,6 +6,7 @@ import { prisma } from '../db'
 import { parseTask } from '../ai'
 import { ensureTelegramUser } from '../users'
 import { saveTelegramAttachment } from '../attachments'
+import { transcribeVoice } from '../voice-transcribe'
 import {
   logTaskHistory,
   type TaskHistoryDetails,
@@ -1852,6 +1853,26 @@ bot.on('message:document', async (ctx) => {
 
 bot.on('message:photo', async (ctx) => {
   await handleIncomingAttachment(ctx, descriptorFromPhoto(ctx.message.photo))
+})
+
+bot.on('message:voice', async (ctx) => {
+  try {
+    const fileLink = await ctx.getFileLink()
+    const res = await fetch(fileLink.url)
+    if (!res.ok) throw new Error(`Failed to download voice: ${res.status}`)
+    const buffer = Buffer.from(await res.arrayBuffer())
+
+    const text = await transcribeVoice(buffer)
+    if (!text) {
+      await ctx.reply('Не удалось распознать голосовое сообщение.')
+      return
+    }
+
+    await ctx.reply(`🎤 Распознано: ${text}`)
+  } catch (error) {
+    console.error('Voice transcription failed:', error)
+    await ctx.reply('Ошибка при распознавании голосового сообщения.')
+  }
 })
 
 bot.catch((err) => {

@@ -45,6 +45,7 @@ COPY --from=bot-deps /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/lib ./lib
+COPY --from=builder /app/proto ./proto
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser

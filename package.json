@@ -13,6 +13,8 @@
     "reminders": "npx prisma migrate deploy && tsx scripts/reminders.ts"
   },
   "dependencies": {
+    "@grpc/grpc-js": "^1.14.4",
+    "@grpc/proto-loader": "^0.8.1",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
