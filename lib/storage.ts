@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { mkdir } from 'node:fs/promises'
 
-const STORAGE_ROOT = path.join(process.cwd(), 'storage', 'uploads')
+const STORAGE_ROOT = path.resolve(process.cwd(), 'storage', 'uploads')
 
 export async function ensureStorageRoot() {
   await mkdir(STORAGE_ROOT, { recursive: true })
@@ -16,7 +16,15 @@ export function toRelativeStoragePath(absolutePath: string) {
 }
 
 export function resolveStoragePath(storagePath: string) {
-  return path.isAbsolute(storagePath) ? storagePath : path.join(process.cwd(), storagePath)
+  const resolved = path.isAbsolute(storagePath)
+    ? path.resolve(storagePath)
+    : path.resolve(process.cwd(), storagePath)
+
+  if (!resolved.startsWith(STORAGE_ROOT)) {
+    throw new Error('Path traversal detected: storage path resolves outside STORAGE_ROOT')
+  }
+
+  return resolved
 }
 
 export function getStorageRoot() {
