@@ -169,7 +169,7 @@ export const TaskCard = memo(function TaskCard({
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Действия">
                 <IconDotsVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -244,10 +244,10 @@ export const TaskCard = memo(function TaskCard({
                   <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Команда</Label>
                   {isManager && (
                      <div className="flex items-center gap-1">
-                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onTeamReset} disabled={isUpdating}>
+                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onTeamReset} disabled={isUpdating} aria-label="Сбросить команду">
                           <IconX className="h-3 w-3" />
                         </Button>
-                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onTeamSave} disabled={isUpdating}>
+                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onTeamSave} disabled={isUpdating} aria-label="Сохранить команду">
                           <IconCircleCheck className="h-3 w-3" />
                         </Button>
                      </div>
@@ -323,7 +323,7 @@ export const TaskCard = memo(function TaskCard({
                           value={deadlineDraft ?? ''} 
                           onChange={(e) => onDeadlineChange(e.target.value)}
                         />
-                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={onDeadlineSave}><IconCircleCheck className="h-4 w-4" /></Button>
+                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={onDeadlineSave} aria-label="Сохранить срок"><IconCircleCheck className="h-4 w-4" /></Button>
                       </div>
                     </div>
 
@@ -404,6 +404,7 @@ export const TaskCard = memo(function TaskCard({
                         className="h-7 w-7"
                         onClick={() => onFileDownload(att)}
                         disabled={downloadingAttachmentId === att.id}
+                        aria-label={`Скачать ${att.fileName || 'файл'}`}
                       >
                         <IconPaperclip className="h-3.5 w-3.5" />
                       </Button>

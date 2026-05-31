@@ -268,7 +268,7 @@ export default function Home() {
                     </div>
                  </div>
               )}
-              <Button variant="ghost" size="icon" onClick={() => fetchTasks(telegramInitDataRef.current!)}>
+              <Button variant="ghost" size="icon" onClick={() => fetchTasks(telegramInitDataRef.current!)} aria-label="Обновить">
                  <IconRefresh className="h-4 w-4" />
               </Button>
            </div>
