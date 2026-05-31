@@ -4,9 +4,6 @@ import { prisma } from '@/lib/db'
 import { validateTelegramWebAppData } from '@/lib/auth'
 import { ensureTelegramUser, isWhitelistedTelegramId } from '@/lib/users'
 
-const DEFAULT_PAGE_SIZE = 50
-const MAX_PAGE_SIZE = 100
-
 export async function GET(request: Request) {
     const initData = request.headers.get('Authorization')
 
@@ -30,13 +27,6 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Access denied' }, { status: 403 })
     }
 
-    const url = new URL(request.url)
-    const cursorParam = url.searchParams.get('cursor')
-    const limitParam = url.searchParams.get('limit')
-    const paginated = cursorParam !== null || limitParam !== null
-    const limit = Math.min(Math.max(Number(limitParam) || DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE)
-    const cursor = cursorParam ? Number(cursorParam) : undefined
-
     try {
         const telegramUser = await ensureTelegramUser({
             id: userId,
@@ -45,30 +35,22 @@ export async function GET(request: Request) {
 
         const isManager = telegramUser.role === 'MANAGER'
 
-        const where = isManager
-            ? undefined
-            : {
-                OR: [
-                    { assigneeId: BigInt(userId) },
-                    { creatorId: BigInt(userId) },
-                    {
-                        assignments: {
-                            some: {
-                                userId: BigInt(userId),
+        const tasks = await prisma.task.findMany({
+            where: isManager
+                ? undefined
+                : {
+                    OR: [
+                        { assigneeId: BigInt(userId) },
+                        { creatorId: BigInt(userId) },
+                        {
+                            assignments: {
+                                some: {
+                                    userId: BigInt(userId),
+                                },
                             },
                         },
-                    },
-                ],
-            }
-
-        const tasks = await prisma.task.findMany({
-            where,
-            ...(paginated
-                ? {
-                    take: limit + 1,
-                    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-                }
-                : {}),
+                    ],
+                },
             include: {
                 assignee: true,
                 creator: true,
@@ -110,14 +92,7 @@ export async function GET(request: Request) {
             orderBy: { createdAt: 'desc' }
         })
 
-        let nextCursor: number | null = null
-        let resultTasks = tasks
-        if (paginated && tasks.length > limit) {
-            resultTasks = tasks.slice(0, limit)
-            nextCursor = resultTasks[resultTasks.length - 1].id
-        }
-
-        const serializedTasks = resultTasks.map((task) => ({
+        const serializedTasks = tasks.map((task) => ({
             id: task.id.toString(),
             title: task.title,
             description: task.description,
@@ -194,7 +169,6 @@ export async function GET(request: Request) {
 
         return NextResponse.json({
             tasks: serializedTasks,
-            nextCursor: paginated ? nextCursor : null,
             user: {
                 id: telegramUser.id.toString(),
                 role: telegramUser.role,
