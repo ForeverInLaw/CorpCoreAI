@@ -34,7 +34,7 @@ export async function consumeDownloadToken(
 
   let record: DownloadTokenRecord
   try {
-    record = (await prisma.downloadToken.delete({
+    record = await prisma.downloadToken.delete({
       where: { token },
       include: {
         attachment: {
@@ -48,7 +48,7 @@ export async function consumeDownloadToken(
           },
         },
       },
-    })) as DownloadTokenRecord
+    })
   } catch (e: unknown) {
     if (
       typeof e === 'object' &&
