@@ -28,7 +28,8 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
+    mkdir -p /app/storage && chown appuser:appgroup /app/storage
 USER appuser
 
 EXPOSE 4174
@@ -46,6 +47,9 @@ FROM base AS bot
 WORKDIR /app
 ENV NODE_ENV=production
 ENV DATABASE_URL="postgresql://x:x@localhost:5432/x"
+
+RUN apk add --no-cache ffmpeg
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/scripts ./scripts
