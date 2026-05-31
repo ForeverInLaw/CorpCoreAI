@@ -122,7 +122,7 @@ export async function transcribeVoice(oggBuffer: Buffer): Promise<string> {
           config: {
             encoding: 'LINEAR_PCM',
             sample_rate_hertz: 16000,
-            language_code: 'ru',
+            language_code: 'multi',
             enable_automatic_punctuation: true,
           },
           audio: wavBuffer,
