@@ -6,7 +6,7 @@ services:
       target: runner
     restart: always
     ports:
-      - '127.0.0.1:3005:3000'
+      - '127.0.0.1:3000:3000'
     env_file:
       - .env
     environment:
@@ -14,6 +14,15 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: always
+    command: ['tunnel', 'run']
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - app
 
   bot:
     build:

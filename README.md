@@ -87,15 +87,26 @@ docker compose up --build
 
 Services:
 
-| Service     | Description                             |
-| ----------- | --------------------------------------- |
-| `app`       | Next.js production server (port 3005)   |
-| `bot`       | Telegram bot                            |
-| `reminders` | Daily reminder + history cleanup job    |
-| `migrate`   | Runs `prisma migrate deploy` then exits |
-| `db`        | PostgreSQL 18                           |
+| Service       | Description                             |
+| ------------- | --------------------------------------- |
+| `app`         | Next.js production server (port 3000)   |
+| `bot`         | Telegram bot                            |
+| `reminders`   | Daily reminder + history cleanup job    |
+| `migrate`     | Runs `prisma migrate deploy` then exits |
+| `db`          | PostgreSQL 18                           |
+| `cloudflared` | Cloudflare Tunnel (optional)            |
 
 All services wait for `migrate` to complete before starting. The `db` service has a healthcheck (`pg_isready`).
+
+### Cloudflare Tunnel
+
+To expose the app via Cloudflare Tunnel, set `CLOUDFLARE_TUNNEL_TOKEN` in `.env` and run:
+
+```bash
+docker compose up --build app cloudflared
+```
+
+The `cloudflared` service connects to Cloudflare and routes traffic to the `app` service. No port mapping needed on the host.
 
 ## Deployment
 
