@@ -56,6 +56,13 @@ const formatDateTime = (dateString: string) =>
   dateTimeFormatter.format(new Date(dateString))
 
 // Helper to format details safely
+const safeStringify = (value: unknown): string => {
+  if (value == null) return '...'
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  return JSON.stringify(value)
+}
+
 const formatDetails = (
   type: TaskHistoryType,
   details: Record<string, unknown> | null | undefined,
@@ -65,19 +72,18 @@ const formatDetails = (
   try {
     switch (type) {
       case 'STATUS_CHANGE':
-        return `${String(details.from ?? '...')} ➔ ${String(details.to ?? '...')}`
+        return `${safeStringify(details.from)} ➔ ${safeStringify(details.to)}`
 
       case 'DEADLINE_CHANGE': {
-        const fromDate = details.from ? formatDate(String(details.from)) : 'нет'
-        const toDate = details.to ? formatDate(String(details.to)) : 'нет'
+        const fromDate = details.from ? safeStringify(details.from) : 'нет'
+        const toDate = details.to ? safeStringify(details.to) : 'нет'
         return `${fromDate} ➔ ${toDate}`
       }
 
       case 'ASSIGNEE_CHANGE':
-        return `${String(details.fromName ?? 'Не назначен')} ➔ ${String(details.toName ?? 'Не назначен')}`
+        return `${safeStringify(details.fromName ?? 'Не назначен')} ➔ ${safeStringify(details.toName ?? 'Не назначен')}`
 
       case 'TEAM_CHANGE':
-        // This might be complex json, let's simplify
         return 'Обновлен список участников'
 
       case 'TAG_CHANGE':
@@ -85,7 +91,7 @@ const formatDetails = (
         return 'Обновлен список'
 
       case 'REVIEW_STATUS_CHANGE':
-        return `${String(details.from ?? '...')} ➔ ${String(details.to ?? '...')}`
+        return `${safeStringify(details.from)} ➔ ${safeStringify(details.to)}`
 
       default:
         return JSON.stringify(details)
