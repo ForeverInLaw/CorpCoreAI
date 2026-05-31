@@ -89,7 +89,7 @@ export default function Home() {
           }
           setNextCursor(data.nextCursor)
 
-          ui.initDrafts(data.tasks)
+          initDrafts(data.tasks)
         }
       } catch (error) {
         console.error(error)
@@ -107,7 +107,6 @@ export default function Home() {
       setCurrentUser,
       setEmployees,
       setAccessDenied,
-      ui,
     ],
   )
 
