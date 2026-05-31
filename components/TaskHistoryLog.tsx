@@ -39,22 +39,22 @@ const HISTORY_LABELS: Record<TaskHistoryType, string> = {
   REVIEW_STATUS_CHANGE: 'Изменен статус ревью',
 }
 
-const formatDate = (dateString: string) => {
-  return new Intl.DateTimeFormat('ru-RU', { 
-    day: 'numeric', 
-    month: 'short', 
-    year: 'numeric' 
-  }).format(new Date(dateString))
-}
+const dateFormatter = new Intl.DateTimeFormat('ru-RU', { 
+  day: 'numeric', 
+  month: 'short', 
+  year: 'numeric' 
+})
 
-const formatDateTime = (dateString: string) => {
-  return new Intl.DateTimeFormat('ru-RU', { 
-    day: 'numeric', 
-    month: 'short', 
-    hour: '2-digit', 
-    minute: '2-digit' 
-  }).format(new Date(dateString))
-}
+const dateTimeFormatter = new Intl.DateTimeFormat('ru-RU', { 
+  day: 'numeric', 
+  month: 'short', 
+  hour: '2-digit', 
+  minute: '2-digit' 
+})
+
+const formatDate = (dateString: string) => dateFormatter.format(new Date(dateString))
+
+const formatDateTime = (dateString: string) => dateTimeFormatter.format(new Date(dateString))
 
 // Helper to format details safely
 const formatDetails = (type: TaskHistoryType, details: Record<string, unknown> | null | undefined): string => {

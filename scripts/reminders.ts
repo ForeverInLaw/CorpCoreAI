@@ -174,9 +174,20 @@ async function runReminderJob() {
   }
 }
 
+const HISTORY_RETENTION_DAYS = 90
+
+async function cleanupOldHistory() {
+  const cutoff = new Date(Date.now() - HISTORY_RETENTION_DAYS * MS_IN_DAY)
+  const { count } = await prisma.taskHistory.deleteMany({
+    where: { createdAt: { lt: cutoff } },
+  })
+  if (count > 0) console.log(`[cleanup] Deleted ${count} TaskHistory entries older than ${HISTORY_RETENTION_DAYS} days`)
+}
+
 void (async () => {
   try {
     await runReminderJob()
+    await cleanupOldHistory()
   } catch (error) {
     console.error('Reminder job failed', error)
     process.exitCode = 1

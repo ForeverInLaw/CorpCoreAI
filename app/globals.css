@@ -86,46 +86,6 @@
   --sidebar-ring: oklch(0.7 0.02 260);
 }
 
-.dark {
-  /* Deep, rich dark mode */
-  --background: oklch(0.1 0.01 260); /* Very dark Zinc */
-  --foreground: oklch(0.98 0.01 260);
-  
-  --card: oklch(0.12 0.01 260);
-  --card-foreground: oklch(0.98 0.01 260);
-  
-  --popover: oklch(0.12 0.01 260);
-  --popover-foreground: oklch(0.98 0.01 260);
-  
-  --primary: oklch(0.98 0.01 260); /* White */
-  --primary-foreground: oklch(0.1 0.01 260); /* Dark Background */
-  
-  --secondary: oklch(0.18 0.01 260);
-  --secondary-foreground: oklch(0.98 0.01 260);
-  
-  --muted: oklch(0.18 0.01 260);
-  --muted-foreground: oklch(0.65 0.01 260);
-  
-  --accent: oklch(0.18 0.01 260);
-  --accent-foreground: oklch(0.98 0.01 260);
-  
-  --destructive: oklch(0.4 0.15 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  
-  --border: oklch(0.2 0.01 260);
-  --input: oklch(0.2 0.01 260);
-  --ring: oklch(0.4 0.01 260);
-  
-  --sidebar: oklch(0.12 0.01 260);
-  --sidebar-foreground: oklch(0.98 0.01 260);
-  --sidebar-primary: oklch(0.98 0.01 260);
-  --sidebar-primary-foreground: oklch(0.1 0.01 260);
-  --sidebar-accent: oklch(0.18 0.01 260);
-  --sidebar-accent-foreground: oklch(0.98 0.01 260);
-  --sidebar-border: oklch(0.2 0.01 260);
-  --sidebar-ring: oklch(0.4 0.01 260);
-}
-
 @layer base {
   * {
     @apply border-border outline-ring/50;

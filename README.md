@@ -45,5 +45,6 @@ Ensure the job runs in an environment where `BOT_TOKEN` and `DATABASE_URL` are a
 - Next.js app: deploy as usual (Vercel, Docker, etc.).
 - Telegram bot: start via `pnpm tsx scripts/bot.ts` or your preferred process manager.
 - Reminder job: keep the hourly job active alongside the bot to guarantee deadline control.
+- Local `pnpm bot` and `pnpm reminders` require a `.env` file with `BOT_TOKEN`, `DATABASE_URL`, etc. (Docker injects these via compose, but local runs need the file).
 
 Refer to Next.js documentation for advanced optimizations, ISR/SSR configuration, etc.

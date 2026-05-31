@@ -165,7 +165,7 @@ model Attachment {
   telegramUniqueFileId String?
   fileName             String?
   mimeType             String?
-  sizeBytes            Int?
+  sizeBytes            Int? // ~2GB max (Int32); files >2GB not expected
   storagePath          String?
   uploadedById         BigInt?
   uploadedBy           User?            @relation(fields: [uploadedById], references: [id])

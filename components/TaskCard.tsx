@@ -225,8 +225,8 @@ export const TaskCard = memo(function TaskCard({
               <div className="rounded-lg border bg-secondary/10 p-3">
                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Подзадачи</h4>
                  <ul className="space-y-1.5">
-                   {task.subtasks.map((sub, i) => (
-                     <li key={i} className="flex items-start gap-2 text-sm">
+                    {task.subtasks.map((sub) => (
+                      <li key={sub} className="flex items-start gap-2 text-sm">
                         <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-primary/40 shrink-0" />
                         <span className="leading-relaxed">{sub}</span>
                      </li>
