@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
   const limitParam = request.nextUrl.searchParams.get('limit')
   const limit = Math.min(
     Math.max(
-      parseInt(limitParam ?? String(DEFAULT_PAGE_SIZE), 10) ||
+      Number.parseInt(limitParam ?? String(DEFAULT_PAGE_SIZE), 10) ||
         DEFAULT_PAGE_SIZE,
       1,
     ),

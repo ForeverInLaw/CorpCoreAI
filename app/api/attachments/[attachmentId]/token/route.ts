@@ -77,7 +77,7 @@ export async function POST(
     },
   })
 
-  if (!attachment || !attachment.task) {
+  if (!attachment?.task) {
     return NextResponse.json({ error: 'Attachment not found' }, { status: 404 })
   }
 

@@ -63,8 +63,8 @@ export default function Home() {
 
   const fetchTasks = useCallback(
     async (initData: string, cursor?: string) => {
-      if (!cursor) setLoading(true)
-      else setLoadingMore(true)
+      if (cursor) setLoadingMore(true)
+      else setLoading(true)
       telegramInitDataRef.current = initData
       try {
         const url = cursor ? `/api/tasks?cursor=${cursor}` : '/api/tasks'
@@ -262,6 +262,14 @@ export default function Home() {
     [handleTaskUpdate, ui],
   )
 
+  const handleTeamRemoveMember = useCallback(
+    (taskId: string, uid: string) =>
+      ui.updateTeamDraft(taskId, (curr) =>
+        curr.filter((m) => m.userId !== uid),
+      ),
+    [ui],
+  )
+
   const filteredTasks = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase()
     return tasks.filter((task) => {
@@ -329,7 +337,7 @@ export default function Home() {
   return (
     <div className="bg-background text-foreground min-h-screen pb-20 font-sans">
       {/* Header */}
-      <header className="border-border/40 bg-background/80 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40 w-full border-b backdrop-blur-xl">
+      <header className="border-border/40 bg-background/80 supports-backdrop-filter:bg-background/60 sticky top-0 z-40 w-full border-b backdrop-blur-xl">
         <div className="container mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
           <div className="flex items-center gap-2">
             <div className="bg-primary text-primary-foreground flex h-8 w-8 items-center justify-center rounded-lg text-lg font-bold tracking-tighter">
@@ -347,7 +355,7 @@ export default function Home() {
                   <span className="text-muted-foreground text-[10px] font-bold tracking-wider uppercase">
                     {isManager ? 'Менеджер' : 'Сотрудник'}
                   </span>
-                  <span className="max-w-[80px] truncate text-xs font-semibold">
+                  <span className="max-w-20 truncate text-xs font-semibold">
                     {currentUser.name?.split(' ')[0]}
                   </span>
                 </div>
@@ -376,7 +384,7 @@ export default function Home() {
             <span className="font-semibold">
               {currentUser?.name?.split(' ')[0]}
             </span>
-            .
+            {'.'}
           </h1>
           <p className="text-muted-foreground">
             У вас{' '}
@@ -404,7 +412,7 @@ export default function Home() {
                 aria-controls={`tabpanel-${tab.id}`}
                 tabIndex={activeTab === tab.id ? 0 : -1}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all duration-200 sm:px-4 sm:py-2 sm:text-sm ${
+                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all duration-200 sm:px-4 sm:py-2 sm:text-sm ${
                   activeTab === tab.id
                     ? 'bg-primary text-primary-foreground border-primary shadow-md'
                     : 'bg-background text-muted-foreground border-border hover:border-primary/30 hover:bg-secondary/50'
@@ -504,9 +512,7 @@ export default function Home() {
                 onTeamSave={() => handleTeamSave(task.id)}
                 onTeamAddMember={(uid) => handleTeamAddMember(task.id, uid)}
                 onTeamRemoveMember={(uid) =>
-                  ui.updateTeamDraft(task.id, (curr) =>
-                    curr.filter((m) => m.userId !== uid),
-                  )
+                  handleTeamRemoveMember(task.id, uid)
                 }
                 onReviewAction={(action) =>
                   handleTaskUpdate(task.id, { reviewAction: action })
@@ -524,7 +530,7 @@ export default function Home() {
             <Button
               variant="outline"
               onClick={() =>
-                fetchTasks(telegramInitDataRef.current!, nextCursor!)
+                fetchTasks(telegramInitDataRef.current!, nextCursor)
               }
               disabled={loadingMore}
             >
