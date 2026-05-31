@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, memo } from 'react'
 import { 
   IconClock, 
   IconDotsVertical, 
@@ -90,7 +90,7 @@ const STATUS_CONFIG: Record<TaskStatus, { label: string; color: string; icon: ty
   CLOSED: { label: 'Closed', color: 'bg-slate-100 text-slate-500 border-slate-200', icon: IconX },
 }
 
-export function TaskCard({
+export const TaskCard = memo(function TaskCard({
   task,
   currentUser,
   employees,
@@ -451,4 +451,4 @@ export function TaskCard({
       )}
     </Card>
   )
-}
+})

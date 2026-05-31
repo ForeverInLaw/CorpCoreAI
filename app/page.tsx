@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { 
   IconSearch, 
   IconRefresh, 
@@ -60,26 +60,7 @@ export default function Home() {
   
   const telegramInitDataRef = useRef<string | null>(null)
 
-  useEffect(() => {
-    // Strict production check: Must be inside Telegram WebApp
-    if (globalThis.window !== undefined && (globalThis.window as { Telegram?: { WebApp?: unknown } }).Telegram?.WebApp) {
-      const tg = (globalThis.window as unknown as { Telegram: { WebApp: { ready: () => void; expand: () => void; initData: string } } }).Telegram.WebApp
-      tg.ready()
-      tg.expand() 
-
-      const initData = tg.initData
-      if (initData) {
-        setIsAuthorized(true)
-        fetchTasks(initData)
-      } else {
-        setLoading(false)
-      }
-    } else {
-      setLoading(false)
-    }
-  }, [])
-
-  const fetchTasks = async (initData: string, cursor?: string) => {
+  const fetchTasks = useCallback(async (initData: string, cursor?: string) => {
     if (!cursor) setLoading(true)
     else setLoadingMore(true)
     telegramInitDataRef.current = initData
@@ -126,7 +107,26 @@ export default function Home() {
       setLoading(false)
       setLoadingMore(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    // Strict production check: Must be inside Telegram WebApp
+    if (globalThis.window !== undefined && (globalThis.window as { Telegram?: { WebApp?: unknown } }).Telegram?.WebApp) {
+      const tg = (globalThis.window as unknown as { Telegram: { WebApp: { ready: () => void; expand: () => void; initData: string } } }).Telegram.WebApp
+      tg.ready()
+      tg.expand() 
+
+      const initData = tg.initData
+      if (initData) {
+        setIsAuthorized(true)
+        fetchTasks(initData)
+      } else {
+        setLoading(false)
+      }
+    } else {
+      setLoading(false)
+    }
+  }, [fetchTasks])
 
   // --- Handlers (Refactored for props) ---
 
@@ -140,7 +140,7 @@ export default function Home() {
     reviewAction?: 'APPROVE' | 'REJECT'
   }
 
-  const handleTaskUpdate = async (taskId: string, payload: TaskUpdatePayload) => {
+  const handleTaskUpdate = useCallback(async (taskId: string, payload: TaskUpdatePayload) => {
     if (!telegramInitDataRef.current) return
     setUpdatingTasks((prev) => ({ ...prev, [taskId]: true }))
     setUpdateErrors((prev) => ({ ...prev, [taskId]: '' }))
@@ -167,11 +167,11 @@ export default function Home() {
     } finally {
       setUpdatingTasks((prev) => ({ ...prev, [taskId]: false }))
     }
-  }
+  }, [fetchTasks])
 
   // ... (Simplified wrappers for TaskCard) ...
 
-  const handleFileUpload = async (taskId: string, file: File) => {
+  const handleFileUpload = useCallback(async (taskId: string, file: File) => {
     if (!telegramInitDataRef.current) return
     setUploadingTaskId(taskId)
     setUploadErrors((prev) => ({ ...prev, [taskId]: '' }))
@@ -193,9 +193,9 @@ export default function Home() {
     } finally {
       setUploadingTaskId(null)
     }
-  }
+  }, [fetchTasks])
 
-  const requestDownloadUrl = async (attachmentId: string) => {
+  const requestDownloadUrl = useCallback(async (attachmentId: string) => {
     if (!telegramInitDataRef.current) throw new Error('Auth missing')
     const response = await fetch(`/api/attachments/${attachmentId}/token`, {
       method: 'POST',
@@ -204,9 +204,9 @@ export default function Home() {
     if (!response.ok) throw new Error('Failed to link')
     const data = await response.json()
     return data.url ?? `/api/attachments/download/${data.token}`
-  }
+  }, [])
 
-  const handleFileDownload = async (attachment: Attachment) => {
+  const handleFileDownload = useCallback(async (attachment: Attachment) => {
     try {
       setDownloadingAttachmentId(attachment.id)
       const url = await requestDownloadUrl(attachment.id)
@@ -216,24 +216,24 @@ export default function Home() {
     } finally {
       setDownloadingAttachmentId(null)
     }
-  }
+  }, [requestDownloadUrl])
 
   // --- Team Logic (Ported) ---
-  const updateTeamDraft = (taskId: string, updater: (current: TaskAssignmentMember[]) => TaskAssignmentMember[]) => {
+  const updateTeamDraft = useCallback((taskId: string, updater: (current: TaskAssignmentMember[]) => TaskAssignmentMember[]) => {
     setTeamDrafts((prev) => ({ ...prev, [taskId]: updater(prev[taskId] ?? []) }))
-  }
+  }, [])
   
-  const handleTeamAddMember = (taskId: string, userId: string) => {
+  const handleTeamAddMember = useCallback((taskId: string, userId: string) => {
      const emp = employees.find(e => e.id === userId); if(!emp) return;
      updateTeamDraft(taskId, curr => curr.some(m => m.userId === userId) ? curr : [...curr, { userId, name: emp.name, isLead: curr.length === 0 }])
-  }
+  }, [employees, updateTeamDraft])
   
-  const handleTeamSave = async (taskId: string) => {
+  const handleTeamSave = useCallback(async (taskId: string) => {
     const draft = teamDrafts[taskId] ?? []
     if (draft.length === 0) return setTeamErrors(p => ({...p, [taskId]: 'Нужен хотя бы 1 участник'}))
     if (!draft.some(m => m.isLead)) return setTeamErrors(p => ({...p, [taskId]: 'Выберите лидера'}))
     await handleTaskUpdate(taskId, { assignments: draft.map(m => ({ userId: m.userId, isLead: m.isLead })) })
-  }
+  }, [teamDrafts, handleTaskUpdate])
 
   // --- Filter Logic ---
   const filteredTasks = useMemo(() => {
